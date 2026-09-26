@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music Note Trainer</title>
+<style>
+/* Music Note Trainer — minimal black & white educational interface. */
+
+:root {
+  --black: #111111;
+  --gray-dark: #333333;
+  --gray-mid: #666666;
+  --gray-light: #999999;
+  --gray-pale: #dddddd;
+  --gray-faint: #f2f2f2;
+  --white: #ffffff;
+  --focus: #111111;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--white);
+  color: var(--black);
+}
+
+body {
+  font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  border-bottom: 1px solid var(--gray-pale);
+  padding-bottom: 16px;
+  margin-bottom: 32px;
+}
+
+.app-header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  letter-spacing: 0.01em;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-size: 14px;
+  color: var(--gray-dark);
+}
+
+.status-group {
+  display: flex;
+  gap: 20px;
+}
+
+/* ---------- Screens ---------- */
+
+.screen[hidden] {
+  display: none;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px;
+}
+
+/* ---------- Settings ---------- */
+
+.settings-field {
+  border: none;
+  border-top: 1px solid var(--gray-pale);
+  padding: 16px 0;
+  margin: 0;
+}
+
+.settings-field legend {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-mid);
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 24px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.choice input {
+  accent-color: var(--black);
+}
+
+#difficulty-input {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 8px;
+  accent-color: var(--black);
+}
+
+.primary-btn {
+  display: inline-block;
+  margin-top: 24px;
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--black);
+  color: var(--white);
+  border: 1px solid var(--black);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background: var(--gray-dark);
+}
+
+.primary-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.settings-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-pale);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.alltime-stats {
+  font-size: 13px;
+  color: var(--gray-mid);
+  margin: 0;
+}
+
+.text-btn {
+  background: none;
+  border: 1px solid var(--gray-pale);
+  color: var(--gray-dark);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.text-btn:hover {
+  border-color: var(--gray-mid);
+}
+
+.text-btn:focus-visible,
+.choice input:focus-visible,
+#difficulty-input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Training screen ---------- */
+
+.training2-prompt {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.training2-prompt .prompt-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-mid);
+  margin-bottom: 4px;
+}
+
+.training2-prompt .prompt-target {
+  font-size: 40px;
+  font-weight: 600;
+}
+
+.staff-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 20px;
+  overflow-x: auto;
+}
+
+.staff-svg {
+  max-width: 100%;
+}
+
+.staff-line {
+  stroke: var(--black);
+  stroke-width: 1.5;
+}
+
+.ledger-line {
+  stroke: var(--black);
+  stroke-width: 1.5;
+}
+
+.ledger-line-preview {
+  stroke: var(--gray-light);
+  stroke-width: 1.5;
+}
+
+.staff-clef {
+  font-size: 58px;
+  fill: var(--black);
+  font-family: "Bravura Text", "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif;
+}
+
+.notehead {
+  fill: var(--black);
+}
+
+.notehead-group.active .notehead {
+  fill: var(--black);
+}
+
+.active-note-highlight {
+  fill: var(--gray-pale);
+  stroke: none;
+}
+
+.hover-indicator {
+  fill: var(--gray-faint);
+  stroke: var(--gray-light);
+  stroke-width: 1;
+}
+
+.notehead-group.transient .notehead {
+  fill: var(--black);
+}
+
+.feedback {
+  min-height: 24px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.feedback-correct {
+  color: var(--gray-dark);
+}
+
+.feedback-incorrect {
+  color: var(--black);
+}
+
+.training2-instruction {
+  text-align: center;
+  color: var(--gray-mid);
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+/* ---------- Training 1 controls ---------- */
+
+.training1-controls {
+  margin-top: 16px;
+}
+
+.note-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.note-btn {
+  min-width: 48px;
+  padding: 10px 14px;
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--white);
+  color: var(--black);
+  border: 1.5px solid var(--black);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.note-btn:hover {
+  background: var(--gray-faint);
+}
+
+.note-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.piano-scroll {
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  padding-bottom: 8px;
+}
+
+.piano-container {
+  position: relative;
+}
+
+.piano-key {
+  position: absolute;
+  top: 0;
+  border-radius: 0 0 3px 3px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.piano-key-white {
+  background: var(--white);
+  border: 1px solid var(--black);
+  z-index: 1;
+}
+
+.piano-key-white:hover {
+  background: var(--gray-faint);
+}
+
+.piano-key-white.pressed {
+  background: var(--gray-pale);
+}
+
+.piano-key-white:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.piano-key-black {
+  background: var(--black);
+  border: 1px solid var(--black);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ---------- Results ---------- */
+
+.results-list {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  gap: 8px 24px;
+  margin: 0 0 28px;
+  font-size: 15px;
+}
+
+.results-list dt {
+  color: var(--gray-mid);
+}
+
+.results-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------- Fatal error ---------- */
+
+.fatal-error {
+  max-width: 480px;
+  margin: 80px auto;
+  text-align: center;
+}
+
+.fatal-error h2 {
+  margin-bottom: 12px;
+}
+
+.fatal-error p {
+  color: var(--gray-mid);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 700px) {
+  #app {
+    padding: 16px 16px 48px;
+  }
+
+  .status-bar {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-group {
+    gap: 16px;
+  }
+
+  .training2-prompt .prompt-target {
+    font-size: 32px;
+  }
+
+  .choice {
+    display: flex;
+    margin-right: 0;
+  }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <h1>Music Note Trainer</h1>
+    <div id="training-status-bar" class="status-bar" hidden>
+      <div class="status-group">
+        <span id="status-training-type"></span>
+        <span id="status-level"></span>
+      </div>
+      <div class="status-group">
+        <span id="status-round-score"></span>
+        <span id="status-session-score"></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <section id="settings-screen" class="screen">
+      <h2>Settings</h2>
+
+      <fieldset class="settings-field">
+        <legend>Training Type</legend>
+        <label class="choice"><input type="radio" name="trainingType" value="staffToNote"> Staff &rarr; Note</label>
+        <label class="choice"><input type="radio" name="trainingType" value="noteToStaff"> Note &rarr; Staff</label>
+      </fieldset>
+
+      <fieldset class="settings-field">
+        <legend>Difficulty</legend>
+        <label for="difficulty-input">Level <span id="difficulty-value">1</span></label>
+        <input type="range" id="difficulty-input" min="1" max="10" step="1" value="1">
+      </fieldset>
+
+      <fieldset class="settings-field">
+        <legend>Naming System</legend>
+        <label class="choice"><input type="radio" name="namingSystem" value="letter"> C D E F G A B</label>
+        <label class="choice"><input type="radio" name="namingSystem" value="solfege"> Do Re Mi Fa Sol La Si</label>
+      </fieldset>
+
+      <fieldset class="settings-field">
+        <legend>Note Button Placement</legend>
+        <label class="choice"><input type="radio" name="noteButtonOrder" value="fixed"> In Order</label>
+        <label class="choice"><input type="radio" name="noteButtonOrder" value="random"> Random</label>
+      </fieldset>
+
+      <fieldset class="settings-field">
+        <legend>Sound</legend>
+        <label class="choice"><input type="radio" name="soundEnabled" value="on"> On</label>
+        <label class="choice"><input type="radio" name="soundEnabled" value="off"> Off</label>
+      </fieldset>
+
+      <button id="train-now-btn" class="primary-btn">Train Now</button>
+
+      <div class="settings-footer">
+        <p id="alltime-stats" class="alltime-stats"></p>
+        <button id="reset-progress-btn" class="text-btn">Reset Progress</button>
+      </div>
+    </section>
+
+    <section id="training-screen" class="screen" hidden>
+
+      <div id="training2-prompt" class="training2-prompt" hidden>
+        <div class="prompt-label">Find:</div>
+        <div id="training2-target" class="prompt-target"></div>
+      </div>
+
+      <div id="staff-container" class="staff-container"></div>
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+
+      <div id="training1-controls" class="training1-controls" hidden>
+        <div id="note-buttons" class="note-buttons"></div>
+        <div class="piano-scroll">
+          <div id="piano-container" class="piano-container"></div>
+        </div>
+      </div>
+
+      <p id="training2-instruction" class="training2-instruction" hidden>Click the correct position on the staff.</p>
+
+    </section>
+
+    <section id="results-screen" class="screen" hidden>
+      <h2>Round Complete</h2>
+      <dl id="results-list" class="results-list"></dl>
+      <button id="train-again-btn" class="primary-btn">Train Again</button>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/**
+ * music.js
+ *
+ * Canonical musical data model for the app.
+ *
+ * Every other module (rendering, generation, scoring, audio) derives its
+ * understanding of a pitch from this module, so rendering, scoring and sound
+ * can never disagree about what a note is (see application requirements #35).
+ *
+ * Core idea: natural notes map onto the staff one-per-diatonic-step. We give
+ * every natural pitch an integer "staff index" where index 0 = the bottom
+ * line of the treble staff (E4) and each +1 = one step up (one line or
+ * space). This single integer is the shared coordinate used by generation,
+ * rendering and click-hit-testing (requirement #22).
+ */
+
+(function (global) {
+  'use strict';
+
+  var NATURAL_LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+  var SOLFEGE_NAMES = {
+    C: 'Do',
+    D: 'Re',
+    E: 'Mi',
+    F: 'Fa',
+    G: 'Sol',
+    A: 'La',
+    B: 'Si'
+  };
+
+  // Semitone offset of each natural letter from C within the same octave.
+  var SEMITONE_FROM_C = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  // Letter's position within an octave, C-based (used for diatonic math).
+  var LETTER_VALUE = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+
+  // Central configuration: the supported pitch range. Change these two
+  // values to widen/narrow the whole app's range; nothing else is hard-coded.
+  var CONFIG = {
+    MIN_PITCH: 'A3',
+    MAX_PITCH: 'C6',
+    A4_FREQUENCY: 440
+  };
+
+  function parsePitch(pitchStr) {
+    var match = /^([A-G])(-?\d+)$/.exec(pitchStr);
+    if (!match) {
+      throw new Error('Invalid pitch string: ' + pitchStr);
+    }
+    return { letter: match[1], octave: parseInt(match[2], 10) };
+  }
+
+  function absoluteDiatonicIndex(letter, octave) {
+    return octave * 7 + LETTER_VALUE[letter];
+  }
+
+  // Reference point: E4 is staff index 0 (bottom line of the treble staff).
+  var REFERENCE_ABSOLUTE_INDEX = absoluteDiatonicIndex('E', 4);
+
+  function staffIndexForPitch(pitchStr) {
+    var p = parsePitch(pitchStr);
+    return absoluteDiatonicIndex(p.letter, p.octave) - REFERENCE_ABSOLUTE_INDEX;
+  }
+
+  function pitchForStaffIndex(staffIndex) {
+    var absolute = staffIndex + REFERENCE_ABSOLUTE_INDEX;
+    var octave = Math.floor(absolute / 7);
+    var letterValue = absolute - octave * 7; // 0..6, safe for negative absolute
+    var letter = NATURAL_LETTERS[letterValue];
+    return letter + octave;
+  }
+
+  function frequencyForPitch(pitchStr) {
+    var p = parsePitch(pitchStr);
+    var semitoneFromC4 = (p.octave - 4) * 12 + SEMITONE_FROM_C[p.letter];
+    var semitonesFromA4 = semitoneFromC4 - 9; // A4 is 9 semitones above C4
+    return CONFIG.A4_FREQUENCY * Math.pow(2, semitonesFromA4 / 12);
+  }
+
+  /**
+   * Builds a full canonical note object for a pitch string, e.g. "C5".
+   * This is the single object shape referenced by requirement #35: notation
+   * name, solfege name, octave, audio pitch and staff position all live on
+   * one object derived from the same source.
+   */
+  function describePitch(pitchStr) {
+    var p = parsePitch(pitchStr);
+    return {
+      name: p.letter,
+      octave: p.octave,
+      pitch: pitchStr,
+      solfege: SOLFEGE_NAMES[p.letter],
+      staffIndex: staffIndexForPitch(pitchStr),
+      frequency: frequencyForPitch(pitchStr)
+    };
+  }
+
+  function displayName(pitchStrOrNote, namingSystem, includeOctave) {
+    var note = typeof pitchStrOrNote === 'string' ? describePitch(pitchStrOrNote) : pitchStrOrNote;
+    var base = namingSystem === 'solfege' ? note.solfege : note.name;
+    return includeOctave ? base + note.octave : base;
+  }
+
+  /**
+   * Builds the ordered list of all natural pitches between minPitch and
+   * maxPitch (inclusive), ascending.
+   */
+  function buildPitchRange(minPitch, maxPitch) {
+    var minIndex = staffIndexForPitch(minPitch);
+    var maxIndex = staffIndexForPitch(maxPitch);
+    var list = [];
+    for (var i = minIndex; i <= maxIndex; i++) {
+      list.push(describePitch(pitchForStaffIndex(i)));
+    }
+    return list;
+  }
+
+  // The five treble-clef staff lines, bottom to top, as staff indices.
+  var STAFF_LINE_INDICES = [0, 2, 4, 6, 8]; // E4, G4, B4, D5, F5
+  var STAFF_BOTTOM_LINE_INDEX = 0; // E4
+  var STAFF_TOP_LINE_INDEX = 8; // F5
+
+  /**
+   * Returns the staff indices that require a drawn ledger line for a note
+   * at the given staff index. Empty array if the note sits on/within the
+   * regular 5-line staff.
+   */
+  function ledgerLineIndicesFor(staffIndex) {
+    var lines = [];
+    if (staffIndex >= STAFF_TOP_LINE_INDEX + 2) {
+      var top = staffIndex % 2 === 0 ? staffIndex : staffIndex - 1;
+      for (var L = STAFF_TOP_LINE_INDEX + 2; L <= top; L += 2) lines.push(L);
+    } else if (staffIndex <= STAFF_BOTTOM_LINE_INDEX - 2) {
+      var bottom = staffIndex % 2 === 0 ? staffIndex : staffIndex + 1;
+      for (var M = STAFF_BOTTOM_LINE_INDEX - 2; M >= bottom; M -= 2) lines.push(M);
+    }
+    return lines;
+  }
+
+  function isSpaceIndex(staffIndex) {
+    return Math.abs(staffIndex % 2) === 1;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  global.Music = {
+    CONFIG: CONFIG,
+    NATURAL_LETTERS: NATURAL_LETTERS,
+    SOLFEGE_NAMES: SOLFEGE_NAMES,
+    parsePitch: parsePitch,
+    staffIndexForPitch: staffIndexForPitch,
+    pitchForStaffIndex: pitchForStaffIndex,
+    frequencyForPitch: frequencyForPitch,
+    describePitch: describePitch,
+    displayName: displayName,
+    buildPitchRange: buildPitchRange,
+    ledgerLineIndicesFor: ledgerLineIndicesFor,
+    isSpaceIndex: isSpaceIndex,
+    STAFF_LINE_INDICES: STAFF_LINE_INDICES,
+    STAFF_BOTTOM_LINE_INDEX: STAFF_BOTTOM_LINE_INDEX,
+    STAFF_TOP_LINE_INDEX: STAFF_TOP_LINE_INDEX,
+    clamp: clamp
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * difficulty.js
+ *
+ * Translates a difficulty level (1-10) into generator parameters, derived
+ * algorithmically rather than as ten hard-coded exercise lists (requirement
+ * #8, #27). Every level is computed from the same formulas so behavior
+ * changes smoothly and predictably as the level increases.
+ */
+
+(function (global) {
+  'use strict';
+
+  var Music = global.Music;
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  /**
+   * Returns the generator parameters for a given difficulty level (1-10).
+   *
+   * - minIndex/maxIndex: the staff-index range exercises are drawn from.
+   * - maxDiatonicJump: largest allowed step (in diatonic steps) between
+   *   consecutive notes when a "jump" is chosen.
+   * - sequentialProbability: chance the next note continues stepwise in the
+   *   current direction rather than jumping.
+   * - repeatProbability: chance the next note repeats the current pitch.
+   * - directionChangeProbability: chance a sequential move flips direction.
+   * - randomness: 0..1 overall unpredictability, used to bias direction/jump.
+   */
+  function getDifficultyParams(level) {
+    var L = Music.clamp(Math.round(level), 1, 10);
+    var t = (L - 1) / 9; // 0 at level 1, 1 at level 10
+
+    var fullMin = Music.staffIndexForPitch(Music.CONFIG.MIN_PITCH);
+    var fullMax = Music.staffIndexForPitch(Music.CONFIG.MAX_PITCH);
+
+    // Level 1 stays in a small, comfortable, central area of the staff.
+    var levelOneMin = Music.staffIndexForPitch('C4');
+    var levelOneMax = Music.staffIndexForPitch('A4');
+
+    var minIndex = Math.round(lerp(levelOneMin, fullMin, t));
+    var maxIndex = Math.round(lerp(levelOneMax, fullMax, t));
+    if (maxIndex <= minIndex) maxIndex = minIndex + 1;
+
+    var rangeSpan = maxIndex - minIndex;
+    var maxDiatonicJump = Math.max(1, Math.round(lerp(1, rangeSpan, Math.pow(t, 1.3))));
+
+    var sequentialProbability = lerp(0.95, 0.08, t);
+    var repeatProbability = lerp(0, 0.18, t);
+    var directionChangeProbability = lerp(0.04, 0.6, t);
+    var randomness = t;
+
+    return {
+      level: L,
+      minIndex: minIndex,
+      maxIndex: maxIndex,
+      maxDiatonicJump: maxDiatonicJump,
+      sequentialProbability: sequentialProbability,
+      repeatProbability: repeatProbability,
+      directionChangeProbability: directionChangeProbability,
+      randomness: randomness
+    };
+  }
+
+  global.Difficulty = {
+    getDifficultyParams: getDifficultyParams
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * exercise-generator.js
+ *
+ * Random exercise generator (requirement #27). Produces an array of pitch
+ * strings that obeys the selected difficulty's parameters.
+ */
+
+(function (global) {
+  'use strict';
+
+  var Music = global.Music;
+  var Difficulty = global.Difficulty;
+
+  function randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  /**
+   * Generates a sequence of natural pitches for one round.
+   *
+   * @param {number} difficulty - level 1-10
+   * @param {number} numberOfNotes - how many notes to generate
+   * @param {{min:string,max:string}} [supportedPitchRange] - optional
+   *        override of the absolute pitch range notes may be clamped to.
+   * @returns {string[]} array of pitches, e.g. ["D4","G5","F4"]
+   */
+  function generateSequence(difficulty, numberOfNotes, supportedPitchRange) {
+    var params = Difficulty.getDifficultyParams(difficulty);
+
+    var hardMin = supportedPitchRange ? Music.staffIndexForPitch(supportedPitchRange.min) : params.minIndex;
+    var hardMax = supportedPitchRange ? Music.staffIndexForPitch(supportedPitchRange.max) : params.maxIndex;
+    var minIndex = Math.max(params.minIndex, hardMin);
+    var maxIndex = Math.min(params.maxIndex, hardMax);
+    if (maxIndex <= minIndex) maxIndex = minIndex + 1;
+
+    var notes = [];
+    var currentIndex = randomInt(minIndex, maxIndex);
+    var direction = Math.random() < 0.5 ? 1 : -1;
+    var repeatStreak = 0;
+
+    for (var i = 0; i < numberOfNotes; i++) {
+      notes.push(Music.pitchForStaffIndex(currentIndex));
+
+      if (i === numberOfNotes - 1) break;
+
+      var nextIndex;
+      var wantsRepeat = Math.random() < params.repeatProbability && repeatStreak < 2;
+
+      if (wantsRepeat) {
+        nextIndex = currentIndex;
+        repeatStreak++;
+      } else if (Math.random() < params.sequentialProbability) {
+        if (Math.random() < params.directionChangeProbability) {
+          direction *= -1;
+        }
+        nextIndex = currentIndex + direction;
+        repeatStreak = 0;
+      } else {
+        var jump = randomInt(1, Math.max(1, params.maxDiatonicJump));
+        var dir = Math.random() < 0.5 ? 1 : -1;
+        nextIndex = currentIndex + jump * dir;
+        direction = dir;
+        repeatStreak = 0;
+      }
+
+      // Bounce back into range instead of clamping flat against the edge
+      // repeatedly, which would otherwise read as "stuck".
+      if (nextIndex > maxIndex) {
+        nextIndex = maxIndex - (nextIndex - maxIndex);
+        direction = -1;
+      } else if (nextIndex < minIndex) {
+        nextIndex = minIndex + (minIndex - nextIndex);
+        direction = 1;
+      }
+      nextIndex = Music.clamp(nextIndex, minIndex, maxIndex);
+
+      currentIndex = nextIndex;
+    }
+
+    return notes;
+  }
+
+  global.ExerciseGenerator = {
+    generateSequence: generateSequence
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * storage.js
+ *
+ * Thin wrapper around localStorage with an in-memory fallback so the app
+ * still functions if persistent storage is unavailable (requirement #41).
+ */
+
+(function (global) {
+  'use strict';
+
+  var SETTINGS_KEY = 'noteTrainer.settings.v1';
+  var STATS_KEY = 'noteTrainer.stats.v1';
+
+  var memoryFallback = {};
+  var localStorageAvailable = (function () {
+    try {
+      var testKey = '__noteTrainer_test__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  function readRaw(key) {
+    if (localStorageAvailable) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(memoryFallback, key) ? memoryFallback[key] : null;
+  }
+
+  function writeRaw(key, value) {
+    if (localStorageAvailable) {
+      try {
+        window.localStorage.setItem(key, value);
+        return;
+      } catch (e) {
+        // fall through to memory fallback
+      }
+    }
+    memoryFallback[key] = value;
+  }
+
+  function removeRaw(key) {
+    if (localStorageAvailable) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch (e) {
+        // ignore
+      }
+    }
+    delete memoryFallback[key];
+  }
+
+  var DEFAULT_SETTINGS = {
+    trainingType: 'staffToNote',
+    difficulty: 3,
+    namingSystem: 'letter',
+    noteButtonOrder: 'fixed',
+    soundEnabled: true
+  };
+
+  var DEFAULT_STATS = {
+    totalRoundsCompleted: 0,
+    totalNotesSolved: 0,
+    totalMistakes: 0
+  };
+
+  function loadSettings() {
+    var raw = readRaw(SETTINGS_KEY);
+    if (!raw) return Object.assign({}, DEFAULT_SETTINGS);
+    try {
+      var parsed = JSON.parse(raw);
+      return Object.assign({}, DEFAULT_SETTINGS, parsed);
+    } catch (e) {
+      return Object.assign({}, DEFAULT_SETTINGS);
+    }
+  }
+
+  function saveSettings(settings) {
+    writeRaw(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  function loadStats() {
+    var raw = readRaw(STATS_KEY);
+    if (!raw) return Object.assign({}, DEFAULT_STATS);
+    try {
+      var parsed = JSON.parse(raw);
+      return Object.assign({}, DEFAULT_STATS, parsed);
+    } catch (e) {
+      return Object.assign({}, DEFAULT_STATS);
+    }
+  }
+
+  function saveStats(stats) {
+    writeRaw(STATS_KEY, JSON.stringify(stats));
+  }
+
+  function resetStats() {
+    removeRaw(STATS_KEY);
+  }
+
+  global.Storage = {
+    isLocalStorageAvailable: localStorageAvailable,
+    loadSettings: loadSettings,
+    saveSettings: saveSettings,
+    loadStats: loadStats,
+    saveStats: saveStats,
+    resetStats: resetStats,
+    DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+    DEFAULT_STATS: DEFAULT_STATS
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * scoring.js
+ *
+ * Deliberately simple scoring model (requirement #18): +1 per correct
+ * answer, -1 per incorrect attempt. Scores are never clamped to zero.
+ */
+
+(function (global) {
+  'use strict';
+
+  function applyCorrect(state) {
+    state.round.score += 1;
+    state.session.score += 1;
+    state.session.notesSolved += 1;
+  }
+
+  function applyIncorrect(state) {
+    state.round.score -= 1;
+    state.session.score -= 1;
+    state.round.mistakes += 1;
+  }
+
+  global.Scoring = {
+    applyCorrect: applyCorrect,
+    applyIncorrect: applyIncorrect
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * audio.js
+ *
+ * Short, clean piano-like tone playback using the Web Audio API. Fails
+ * gracefully: if audio cannot initialize, playPitch becomes a no-op and the
+ * rest of the app keeps working (requirement #41).
+ */
+
+(function (global) {
+  'use strict';
+
+  var audioContext = null;
+  var initFailed = false;
+  var activeVoices = [];
+  var MAX_CONCURRENT_VOICES = 6;
+
+  function getContext() {
+    if (audioContext || initFailed) return audioContext;
+    try {
+      var AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContextClass();
+    } catch (e) {
+      initFailed = true;
+      audioContext = null;
+    }
+    return audioContext;
+  }
+
+  // Some browsers require a user gesture to resume a suspended context.
+  function ensureResumed() {
+    var ctx = getContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(function () {});
+    }
+  }
+
+  function stopVoice(voice) {
+    try {
+      voice.oscillators.forEach(function (osc) {
+        osc.stop();
+      });
+    } catch (e) {
+      // already stopped
+    }
+  }
+
+  /**
+   * Plays a short piano-like tone at the given frequency.
+   * @param {number} frequencyHz
+   */
+  function playFrequency(frequencyHz) {
+    var ctx = getContext();
+    if (!ctx) return;
+    ensureResumed();
+
+    if (activeVoices.length >= MAX_CONCURRENT_VOICES) {
+      var oldest = activeVoices.shift();
+      stopVoice(oldest);
+    }
+
+    var now = ctx.currentTime;
+    var duration = 0.55;
+
+    var master = ctx.createGain();
+    master.gain.setValueAtTime(0, now);
+    master.gain.linearRampToValueAtTime(0.35, now + 0.01);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    master.connect(ctx.destination);
+
+    // A fundamental plus two quiet partials gives a simple, clean
+    // piano-ish timbre without needing sample playback.
+    var partials = [
+      { ratio: 1, gain: 1.0, type: 'triangle' },
+      { ratio: 2, gain: 0.25, type: 'sine' },
+      { ratio: 3, gain: 0.12, type: 'sine' }
+    ];
+
+    var oscillators = partials.map(function (partial) {
+      var osc = ctx.createOscillator();
+      osc.type = partial.type;
+      osc.frequency.setValueAtTime(frequencyHz * partial.ratio, now);
+
+      var partialGain = ctx.createGain();
+      partialGain.gain.setValueAtTime(partial.gain, now);
+
+      osc.connect(partialGain);
+      partialGain.connect(master);
+      osc.start(now);
+      osc.stop(now + duration + 0.05);
+      return osc;
+    });
+
+    var voice = { oscillators: oscillators };
+    activeVoices.push(voice);
+
+    oscillators[0].onended = function () {
+      var idx = activeVoices.indexOf(voice);
+      if (idx !== -1) activeVoices.splice(idx, 1);
+    };
+  }
+
+  function playPitch(pitchStr) {
+    try {
+      var frequency = global.Music.frequencyForPitch(pitchStr);
+      playFrequency(frequency);
+    } catch (e) {
+      // Audio is best-effort; never let it break training.
+    }
+  }
+
+  global.Audio2 = {
+    playPitch: playPitch,
+    isAvailable: function () {
+      return !initFailed;
+    }
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * piano.js
+ *
+ * Renders a realistic piano keyboard: white keys with correct relative
+ * positioning and black keys in proper 2/3 groupings (requirement #24).
+ * Only natural (white) keys are interactive/scoreable; black keys are
+ * decorative, for visual realism only.
+ */
+
+(function (global) {
+  'use strict';
+
+  var Music = global.Music;
+
+  // Whether a white-key letter has a black key immediately to its right.
+  var HAS_BLACK_KEY_AFTER = { C: true, D: true, E: false, F: true, G: true, A: true, B: false };
+
+  /**
+   * @param {HTMLElement} container
+   * @param {Object} options
+   * @param {string} options.minPitch - lowest white key, e.g. "C3"
+   * @param {string} options.maxPitch - highest white key, e.g. "C6"
+   * @param {function(string)} options.onNoteAnswer - called with pitch class only (e.g. "C")
+   * @param {function(string)} [options.onPlayPitch] - called with full pitch (e.g. "C4") for sound
+   */
+  function renderPiano(container, options) {
+    container.innerHTML = '';
+    container.classList.add('piano');
+    container.setAttribute('role', 'group');
+    container.setAttribute('aria-label', 'Piano keyboard');
+
+    var whiteNotes = Music.buildPitchRange(options.minPitch, options.maxPitch).filter(function (n) {
+      return true; // buildPitchRange already only contains naturals
+    });
+
+    var whiteKeyWidth = 40;
+    var blackKeyWidth = 24;
+    var whiteKeyHeight = 130;
+    var blackKeyHeight = 82;
+
+    container.style.position = 'relative';
+    container.style.width = (whiteNotes.length * whiteKeyWidth) + 'px';
+    container.style.height = whiteKeyHeight + 'px';
+
+    whiteNotes.forEach(function (note, index) {
+      var key = document.createElement('button');
+      key.type = 'button';
+      key.className = 'piano-key piano-key-white';
+      key.style.left = (index * whiteKeyWidth) + 'px';
+      key.style.width = whiteKeyWidth + 'px';
+      key.style.height = whiteKeyHeight + 'px';
+      key.setAttribute('aria-label', note.pitch + ' key');
+      key.dataset.pitch = note.pitch;
+      key.dataset.pitchClass = note.name;
+
+      key.addEventListener('click', function () {
+        pressVisual(key);
+        if (typeof options.onPlayPitch === 'function') options.onPlayPitch(note.pitch);
+        if (typeof options.onNoteAnswer === 'function') options.onNoteAnswer(note.name);
+      });
+
+      container.appendChild(key);
+
+      if (HAS_BLACK_KEY_AFTER[note.name] && index < whiteNotes.length - 1) {
+        var blackKey = document.createElement('div');
+        blackKey.className = 'piano-key piano-key-black';
+        blackKey.style.left = ((index + 1) * whiteKeyWidth - blackKeyWidth / 2) + 'px';
+        blackKey.style.width = blackKeyWidth + 'px';
+        blackKey.style.height = blackKeyHeight + 'px';
+        blackKey.setAttribute('aria-hidden', 'true');
+        container.appendChild(blackKey);
+      }
+    });
+  }
+
+  function pressVisual(keyEl) {
+    keyEl.classList.add('pressed');
+    setTimeout(function () {
+      keyEl.classList.remove('pressed');
+    }, 150);
+  }
+
+  global.Piano = {
+    renderPiano: renderPiano
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * staff-renderer.js
+ *
+ * Renders the treble staff as SVG and provides the shared coordinate
+ * mapping between musical pitch and vertical pixel position, used by both
+ * training modes (requirement #22):
+ *
+ *   pitch -> diatonic staff index -> Y coordinate      (rendering)
+ *   click Y coordinate -> nearest staff index -> pitch (answer validation)
+ *
+ * The renderer always reserves vertical space for the full configured
+ * pitch range (Music.CONFIG.MIN_PITCH..MAX_PITCH) so every ledger position
+ * is always available to click, even when nothing is currently drawn there.
+ */
+
+(function (global) {
+  'use strict';
+
+  var Music = global.Music;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function el(name, attrs) {
+    var node = document.createElementNS(SVG_NS, name);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (key) {
+        node.setAttribute(key, attrs[key]);
+      });
+    }
+    return node;
+  }
+
+  function StaffRenderer(container) {
+    this.container = container;
+
+    this.minIndexFull = Music.staffIndexForPitch(Music.CONFIG.MIN_PITCH);
+    this.maxIndexFull = Music.staffIndexForPitch(Music.CONFIG.MAX_PITCH);
+
+    this.paddingSteps = 3;
+    this.halfStep = 9; // px per diatonic step
+    this.clefWidth = 64;
+    this.leftMargin = 24;
+    this.rightMargin = 24;
+    this.minNoteSpacing = 56;
+    this.noteRadiusX = 7.5;
+    this.noteRadiusY = 6;
+    this.ledgerHalfWidth = 13;
+
+    this.svg = null;
+    this.width = 0;
+    this.height = this.computeHeight();
+    this.noteEls = [];
+    this._interactionHandlers = null;
+  }
+
+  StaffRenderer.prototype.computeHeight = function () {
+    return (this.maxIndexFull - this.minIndexFull + this.paddingSteps * 2) * this.halfStep;
+  };
+
+  StaffRenderer.prototype.yForIndex = function (index) {
+    return (this.maxIndexFull + this.paddingSteps - index) * this.halfStep;
+  };
+
+  StaffRenderer.prototype.indexForY = function (y) {
+    var raw = this.maxIndexFull + this.paddingSteps - y / this.halfStep;
+    return Math.round(raw);
+  };
+
+  StaffRenderer.prototype.clampToFullRange = function (index) {
+    return Music.clamp(index, this.minIndexFull, this.maxIndexFull);
+  };
+
+  /**
+   * Computes how many notes can fit across the available staff width
+   * without overcrowding (requirement #29).
+   */
+  StaffRenderer.prototype.computeNoteCapacity = function (widthPx) {
+    var usable = widthPx - this.clefWidth - this.leftMargin - this.rightMargin;
+    var capacity = Math.floor(usable / this.minNoteSpacing);
+    return Music.clamp(capacity, 4, 24);
+  };
+
+  StaffRenderer.prototype._buildBase = function (widthPx) {
+    this.width = Math.max(widthPx, 260);
+    this.height = this.computeHeight();
+
+    this.container.innerHTML = '';
+    var svg = el('svg', {
+      width: this.width,
+      height: this.height,
+      viewBox: '0 0 ' + this.width + ' ' + this.height,
+      class: 'staff-svg'
+    });
+    svg.style.width = this.width + 'px';
+    svg.style.height = this.height + 'px';
+    svg.style.display = 'block';
+
+    var lineStartX = 10;
+    var lineEndX = this.width - 10;
+
+    Music.STAFF_LINE_INDICES.forEach(function (idx) {
+      var y = this.yForIndex(idx);
+      svg.appendChild(el('line', {
+        x1: lineStartX, y1: y, x2: lineEndX, y2: y,
+        class: 'staff-line'
+      }));
+    }, this);
+
+    var clefY = this.yForIndex(Music.staffIndexForPitch('B4'));
+    var clefText = el('text', {
+      x: lineStartX + 6,
+      y: clefY,
+      class: 'staff-clef'
+    });
+    clefText.textContent = '𝄞'; // MUSICAL SYMBOL G CLEF (surrogate pair)
+    svg.appendChild(clefText);
+
+    this.container.appendChild(svg);
+    this.svg = svg;
+    this.noteAreaStartX = lineStartX + this.clefWidth;
+    this.noteAreaEndX = lineEndX;
+    return svg;
+  };
+
+  StaffRenderer.prototype._drawLedgerLines = function (svg, x, staffIndex, extraClass) {
+    var indices = Music.ledgerLineIndicesFor(staffIndex);
+    indices.forEach(function (li) {
+      var y = this.yForIndex(li);
+      svg.appendChild(el('line', {
+        x1: x - this.ledgerHalfWidth, y1: y, x2: x + this.ledgerHalfWidth, y2: y,
+        class: 'ledger-line' + (extraClass ? ' ' + extraClass : '')
+      }));
+    }, this);
+  };
+
+  StaffRenderer.prototype._drawNotehead = function (svg, x, staffIndex, extraClass) {
+    var group = el('g', { class: 'notehead-group' + (extraClass ? ' ' + extraClass : '') });
+    this._drawLedgerLines(svg, x, staffIndex, extraClass);
+    var y = this.yForIndex(staffIndex);
+    var head = el('ellipse', {
+      cx: x, cy: y, rx: this.noteRadiusX, ry: this.noteRadiusY,
+      class: 'notehead'
+    });
+    group.appendChild(head);
+    svg.appendChild(group);
+    return group;
+  };
+
+  /**
+   * Renders a full sequence of notes simultaneously (Training 1).
+   * @returns nothing; use setActiveNote / markSolved to update state.
+   */
+  StaffRenderer.prototype.renderSequence = function (widthPx, notes, activeIndex) {
+    var svg = this._buildBase(widthPx);
+    this.noteEls = [];
+
+    var count = notes.length;
+    var usable = this.noteAreaEndX - this.noteAreaStartX;
+    var spacing = usable / count;
+
+    notes.forEach(function (pitch, i) {
+      var staffIndex = Music.staffIndexForPitch(pitch);
+      var x = this.noteAreaStartX + spacing * (i + 0.5);
+      var highlightCircle = null;
+
+      if (i === activeIndex) {
+        var y = this.yForIndex(staffIndex);
+        highlightCircle = el('circle', {
+          cx: x, cy: y, r: this.noteRadiusX + 6,
+          class: 'active-note-highlight'
+        });
+        svg.appendChild(highlightCircle);
+      }
+
+      var group = this._drawNotehead(svg, x, staffIndex, i === activeIndex ? 'active' : null);
+      this.noteEls.push({ x: x, staffIndex: staffIndex, group: group, highlight: highlightCircle });
+    }, this);
+  };
+
+  StaffRenderer.prototype.setActiveNote = function (index) {
+    this.noteEls.forEach(function (entry, i) {
+      if (entry.highlight) {
+        entry.highlight.remove();
+        entry.highlight = null;
+      }
+      entry.group.classList.toggle('active', i === index);
+    });
+    var entry = this.noteEls[index];
+    if (entry) {
+      var y = this.yForIndex(entry.staffIndex);
+      var circle = el('circle', {
+        cx: entry.x, cy: y, r: this.noteRadiusX + 6,
+        class: 'active-note-highlight'
+      });
+      this.svg.insertBefore(circle, entry.group);
+      entry.highlight = circle;
+    }
+  };
+
+  /**
+   * Renders an empty staff ready for click-based interaction (Training 2).
+   */
+  StaffRenderer.prototype.renderEmpty = function (widthPx) {
+    this._buildBase(widthPx);
+    this._transientGroup = null;
+    this._hoverEl = null;
+    this._hoverLedgerGroup = null;
+  };
+
+  StaffRenderer.prototype._clearHover = function () {
+    if (this._hoverEl) {
+      this._hoverEl.remove();
+      this._hoverEl = null;
+    }
+    if (this._hoverLedgerGroup) {
+      this._hoverLedgerGroup.remove();
+      this._hoverLedgerGroup = null;
+    }
+  };
+
+  StaffRenderer.prototype._drawHover = function (staffIndex) {
+    this._clearHover();
+    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var y = this.yForIndex(staffIndex);
+
+    var hover = el('ellipse', {
+      cx: x, cy: y, rx: this.noteRadiusX + 3, ry: this.noteRadiusY + 3,
+      class: 'hover-indicator'
+    });
+    this.svg.appendChild(hover);
+    this._hoverEl = hover;
+
+    var ledgerGroup = el('g', { class: 'hover-ledger-preview' });
+    var indices = Music.ledgerLineIndicesFor(staffIndex);
+    indices.forEach(function (li) {
+      var ly = this.yForIndex(li);
+      ledgerGroup.appendChild(el('line', {
+        x1: x - this.ledgerHalfWidth, y1: ly, x2: x + this.ledgerHalfWidth, y2: ly,
+        class: 'ledger-line-preview'
+      }));
+    }, this);
+    this.svg.appendChild(ledgerGroup);
+    this._hoverLedgerGroup = ledgerGroup;
+  };
+
+  /**
+   * Enables click/hover interaction for Training 2. Callbacks receive the
+   * clamped staff index only -- never a rendered note name.
+   */
+  StaffRenderer.prototype.enableInteraction = function (callbacks) {
+    if (!this.svg) return;
+    var self = this;
+
+    function indexFromEvent(evt) {
+      var rect = self.svg.getBoundingClientRect();
+      var y = evt.clientY - rect.top;
+      var idx = self.indexForY(y);
+      return self.clampToFullRange(idx);
+    }
+
+    function onMove(evt) {
+      var idx = indexFromEvent(evt);
+      self._drawHover(idx);
+      if (callbacks.onHover) callbacks.onHover(idx);
+    }
+
+    function onLeave() {
+      self._clearHover();
+    }
+
+    function onClick(evt) {
+      var idx = indexFromEvent(evt);
+      if (callbacks.onClick) callbacks.onClick(idx);
+    }
+
+    this.svg.addEventListener('mousemove', onMove);
+    this.svg.addEventListener('mouseleave', onLeave);
+    this.svg.addEventListener('click', onClick);
+    this.svg.style.cursor = 'pointer';
+
+    this._interactionHandlers = { onMove: onMove, onLeave: onLeave, onClick: onClick };
+  };
+
+  StaffRenderer.prototype.disableInteraction = function () {
+    if (!this.svg || !this._interactionHandlers) return;
+    this.svg.removeEventListener('mousemove', this._interactionHandlers.onMove);
+    this.svg.removeEventListener('mouseleave', this._interactionHandlers.onLeave);
+    this.svg.removeEventListener('click', this._interactionHandlers.onClick);
+    this.svg.style.cursor = 'default';
+    this._interactionHandlers = null;
+    this._clearHover();
+  };
+
+  /**
+   * Briefly shows the resolved note at its staff position (Training 2
+   * correct-answer feedback), then removes it.
+   */
+  StaffRenderer.prototype.flashNote = function (pitch, durationMs, onDone) {
+    this._clearHover();
+    if (this._transientGroup) {
+      this._transientGroup.remove();
+      this._transientGroup = null;
+    }
+    var staffIndex = Music.staffIndexForPitch(pitch);
+    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var group = this._drawNotehead(this.svg, x, staffIndex, 'transient');
+    this._transientGroup = group;
+
+    setTimeout(function () {
+      if (group) group.remove();
+      this._clearLedgerLinesFor(group);
+      if (this._transientGroup === group) this._transientGroup = null;
+      if (onDone) onDone();
+    }.bind(this), durationMs);
+  };
+
+  // Ledger lines for the transient note are siblings appended to the svg,
+  // not children of the note group, so remove them alongside it.
+  StaffRenderer.prototype._clearLedgerLinesFor = function () {
+    if (!this.svg) return;
+    var stray = this.svg.querySelectorAll('.ledger-line.transient');
+    stray.forEach(function (node) {
+      node.remove();
+    });
+  };
+
+  global.StaffRenderer = StaffRenderer;
+})(window);
+</script>
+
+<script>
+/**
+ * state.js
+ *
+ * Central application state (requirement #25). Training logic that mutates
+ * this state lives here and in app.js's event handlers; DOM rendering is
+ * kept in the renderer/piano/settings modules so the two stay decoupled.
+ */
+
+(function (global) {
+  'use strict';
+
+  var Storage = global.Storage;
+
+  function createInitialState() {
+    var savedSettings = Storage.loadSettings();
+    var savedStats = Storage.loadStats();
+
+    return {
+      settings: savedSettings,
+
+      session: {
+        score: 0,
+        roundsCompleted: 0,
+        notesSolved: 0,
+        // Determined once, the first time it's needed, and then kept for
+        // the rest of the session so button positions don't shift on the
+        // user mid-session (requirement: random order stays fixed).
+        noteButtonLetters: null
+      },
+
+      persistentStats: savedStats,
+
+      round: {
+        notes: [],
+        currentIndex: 0,
+        score: 0,
+        mistakes: 0,
+        completed: false
+      },
+
+      currentQuestion: {
+        pitch: null,
+        pitchClass: null,
+        octave: null,
+        staffIndex: null
+      },
+
+      view: 'settings' // 'settings' | 'training' | 'results'
+    };
+  }
+
+  global.AppState = {
+    createInitialState: createInitialState
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * settings.js
+ *
+ * Renders and wires the pre-round settings panel (requirement #7). Reads
+ * and writes state.settings, persisting on every change so the most recent
+ * choices survive a reload (requirement #26).
+ */
+
+(function (global) {
+  'use strict';
+
+  var Storage = global.Storage;
+
+  function initSettingsPanel(root, state, callbacks) {
+    var trainingTypeInputs = root.querySelectorAll('input[name="trainingType"]');
+    var difficultyInput = root.querySelector('#difficulty-input');
+    var difficultyValue = root.querySelector('#difficulty-value');
+    var namingSystemInputs = root.querySelectorAll('input[name="namingSystem"]');
+    var noteButtonOrderInputs = root.querySelectorAll('input[name="noteButtonOrder"]');
+    var soundInputs = root.querySelectorAll('input[name="soundEnabled"]');
+    var trainNowBtn = root.querySelector('#train-now-btn');
+    var resetProgressBtn = root.querySelector('#reset-progress-btn');
+    var statsEl = root.querySelector('#alltime-stats');
+
+    function applySettingsToForm() {
+      trainingTypeInputs.forEach(function (input) {
+        input.checked = input.value === state.settings.trainingType;
+      });
+      difficultyInput.value = state.settings.difficulty;
+      difficultyValue.textContent = state.settings.difficulty;
+      namingSystemInputs.forEach(function (input) {
+        input.checked = input.value === state.settings.namingSystem;
+      });
+      noteButtonOrderInputs.forEach(function (input) {
+        input.checked = input.value === state.settings.noteButtonOrder;
+      });
+      soundInputs.forEach(function (input) {
+        input.checked = (input.value === 'on') === !!state.settings.soundEnabled;
+      });
+    }
+
+    function persist() {
+      Storage.saveSettings(state.settings);
+    }
+
+    function renderStats() {
+      var stats = state.persistentStats;
+      statsEl.textContent = 'All-time: ' + stats.totalRoundsCompleted + ' rounds completed, ' +
+        stats.totalNotesSolved + ' notes solved.';
+    }
+
+    trainingTypeInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.trainingType = input.value;
+          persist();
+        }
+      });
+    });
+
+    difficultyInput.addEventListener('input', function () {
+      state.settings.difficulty = parseInt(difficultyInput.value, 10);
+      difficultyValue.textContent = state.settings.difficulty;
+      persist();
+    });
+
+    namingSystemInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.namingSystem = input.value;
+          persist();
+        }
+      });
+    });
+
+    noteButtonOrderInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.noteButtonOrder = input.value;
+          persist();
+        }
+      });
+    });
+
+    soundInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.soundEnabled = input.value === 'on';
+          persist();
+        }
+      });
+    });
+
+    trainNowBtn.addEventListener('click', function () {
+      persist();
+      if (callbacks.onStart) callbacks.onStart();
+    });
+
+    resetProgressBtn.addEventListener('click', function () {
+      var confirmed = window.confirm('Reset all saved training statistics? This cannot be undone.');
+      if (!confirmed) return;
+      Storage.resetStats();
+      state.persistentStats = Object.assign({}, Storage.DEFAULT_STATS);
+      renderStats();
+    });
+
+    applySettingsToForm();
+    renderStats();
+
+    return {
+      refresh: function () {
+        applySettingsToForm();
+        renderStats();
+      }
+    };
+  }
+
+  global.SettingsPanel = {
+    initSettingsPanel: initSettingsPanel
+  };
+})(window);
+</script>
+
+<script>
+/**
+ * app.js
+ *
+ * Wires together settings, training logic and rendering. Owns the overall
+ * flow (settings -> training -> results -> settings) described in
+ * requirement #43.
+ */
+
+(function () {
+  'use strict';
+
+  var Music = window.Music;
+  var Storage = window.Storage;
+  var Scoring = window.Scoring;
+  var ExerciseGenerator = window.ExerciseGenerator;
+  var Piano = window.Piano;
+  var Audio2 = window.Audio2;
+  var StaffRenderer = window.StaffRenderer;
+  var SettingsPanel = window.SettingsPanel;
+
+  var PIANO_MIN_PITCH = 'C3';
+  var PIANO_MAX_PITCH = 'C6';
+  var CORRECT_ADVANCE_DELAY_MS = 350;
+  var TRAINING2_FLASH_MS = 700;
+
+  var state;
+  var staffRenderer;
+  var settingsPanelApi;
+  var lockAnswering = false;
+
+  var els = {};
+
+  function cacheElements() {
+    els.settingsScreen = document.getElementById('settings-screen');
+    els.trainingScreen = document.getElementById('training-screen');
+    els.resultsScreen = document.getElementById('results-screen');
+
+    els.statusBar = document.getElementById('training-status-bar');
+    els.statusTrainingType = document.getElementById('status-training-type');
+    els.statusLevel = document.getElementById('status-level');
+    els.statusRoundScore = document.getElementById('status-round-score');
+    els.statusSessionScore = document.getElementById('status-session-score');
+
+    els.staffContainer = document.getElementById('staff-container');
+    els.feedback = document.getElementById('feedback');
+
+    els.training1Controls = document.getElementById('training1-controls');
+    els.noteButtons = document.getElementById('note-buttons');
+    els.pianoContainer = document.getElementById('piano-container');
+
+    els.training2Prompt = document.getElementById('training2-prompt');
+    els.training2Target = document.getElementById('training2-target');
+    els.training2Instruction = document.getElementById('training2-instruction');
+
+    els.resultsList = document.getElementById('results-list');
+    els.trainAgainBtn = document.getElementById('train-again-btn');
+  }
+
+  function showScreen(name) {
+    state.view = name;
+    els.settingsScreen.hidden = name !== 'settings';
+    els.trainingScreen.hidden = name !== 'training';
+    els.resultsScreen.hidden = name !== 'results';
+    els.statusBar.hidden = name !== 'training';
+  }
+
+  var TRAINING_TYPE_LABELS = {
+    staffToNote: 'Staff → Note',
+    noteToStaff: 'Note → Staff'
+  };
+
+  function updateStatusBar() {
+    els.statusTrainingType.textContent = 'Training: ' + TRAINING_TYPE_LABELS[state.settings.trainingType];
+    els.statusLevel.textContent = 'Level: ' + state.settings.difficulty;
+    els.statusRoundScore.textContent = 'Round Score: ' + state.round.score;
+    els.statusSessionScore.textContent = 'Session Score: ' + state.session.score;
+  }
+
+  var feedbackClearTimer = null;
+
+  function clearFeedback() {
+    if (feedbackClearTimer) {
+      clearTimeout(feedbackClearTimer);
+      feedbackClearTimer = null;
+    }
+    els.feedback.textContent = '';
+    els.feedback.className = 'feedback';
+  }
+
+  function showFeedback(kind) {
+    if (feedbackClearTimer) {
+      clearTimeout(feedbackClearTimer);
+      feedbackClearTimer = null;
+    }
+    if (kind === 'correct') {
+      els.feedback.textContent = 'Correct';
+      els.feedback.className = 'feedback feedback-correct';
+      feedbackClearTimer = setTimeout(clearFeedback, 900);
+    } else {
+      els.feedback.textContent = 'Incorrect. Try again.';
+      els.feedback.className = 'feedback feedback-incorrect';
+    }
+  }
+
+  function setCurrentQuestionFromIndex(index) {
+    var pitch = state.round.notes[index];
+    var note = Music.describePitch(pitch);
+    state.currentQuestion = {
+      pitch: note.pitch,
+      pitchClass: note.name,
+      octave: note.octave,
+      staffIndex: note.staffIndex
+    };
+  }
+
+  function persistStatsAfterRound() {
+    state.persistentStats.totalRoundsCompleted += 1;
+    state.persistentStats.totalNotesSolved += state.round.notes.length;
+    state.persistentStats.totalMistakes += state.round.mistakes;
+    Storage.saveStats(state.persistentStats);
+  }
+
+  function completeRound() {
+    state.round.completed = true;
+    state.session.roundsCompleted += 1;
+    persistStatsAfterRound();
+    showResults();
+  }
+
+  function showResults() {
+    els.resultsList.innerHTML = '';
+    var rows = [
+      ['Difficulty level', String(state.settings.difficulty)],
+      ['Notes solved', String(state.round.notes.length)],
+      ['Mistakes', String(state.round.mistakes)],
+      ['Round score', String(state.round.score)],
+      ['Session score', String(state.session.score)]
+    ];
+    rows.forEach(function (pair) {
+      var dt = document.createElement('dt');
+      dt.textContent = pair[0];
+      var dd = document.createElement('dd');
+      dd.textContent = pair[1];
+      els.resultsList.appendChild(dt);
+      els.resultsList.appendChild(dd);
+    });
+    if (settingsPanelApi) settingsPanelApi.refresh();
+    showScreen('results');
+  }
+
+  // ---------- Training 1: Staff -> Note ----------
+
+  function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = array[i];
+      array[i] = array[j];
+      array[j] = tmp;
+    }
+    return array;
+  }
+
+  // When settings.noteButtonOrder is "random", the shuffled order is
+  // determined once -- the first time it's needed -- and then reused for
+  // the rest of the session, so button positions never shift mid-session
+  // even though they still prevent memorizing a fixed layout across
+  // sessions (requirement: prevent guessing the next note by placement).
+  function getNoteButtonLetters() {
+    if (state.settings.noteButtonOrder !== 'random') {
+      return Music.NATURAL_LETTERS;
+    }
+    if (!state.session.noteButtonLetters) {
+      state.session.noteButtonLetters = shuffleArray(Music.NATURAL_LETTERS.slice());
+    }
+    return state.session.noteButtonLetters;
+  }
+
+  function renderNoteButtons() {
+    els.noteButtons.innerHTML = '';
+    var letters = getNoteButtonLetters();
+    letters.forEach(function (letter) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'note-btn';
+      btn.textContent = state.settings.namingSystem === 'solfege' ? Music.SOLFEGE_NAMES[letter] : letter;
+      btn.dataset.pitchClass = letter;
+      btn.addEventListener('click', function () {
+        handleTraining1Answer(letter, { viaPiano: false });
+      });
+      els.noteButtons.appendChild(btn);
+    });
+  }
+
+  function renderPianoForTraining1() {
+    Piano.renderPiano(els.pianoContainer, {
+      minPitch: PIANO_MIN_PITCH,
+      maxPitch: PIANO_MAX_PITCH,
+      onPlayPitch: function (pitch) {
+        if (state.settings.soundEnabled) Audio2.playPitch(pitch);
+      },
+      onNoteAnswer: function (pitchClass) {
+        handleTraining1Answer(pitchClass, { viaPiano: true });
+      }
+    });
+  }
+
+  function startTraining1() {
+    els.training1Controls.hidden = false;
+    els.training2Prompt.hidden = true;
+    els.training2Instruction.hidden = true;
+
+    var width = els.staffContainer.clientWidth || 800;
+    staffRenderer.renderSequence(width, state.round.notes, state.round.currentIndex);
+
+    renderNoteButtons();
+    renderPianoForTraining1();
+    clearFeedback();
+    setCurrentQuestionFromIndex(state.round.currentIndex);
+    lockAnswering = false;
+  }
+
+  function handleTraining1Answer(pitchClass, options) {
+    if (lockAnswering || state.round.completed) return;
+    var isCorrect = pitchClass === state.currentQuestion.pitchClass;
+
+    if (isCorrect) {
+      Scoring.applyCorrect(state);
+      if (state.settings.soundEnabled && !(options && options.viaPiano)) {
+        Audio2.playPitch(state.currentQuestion.pitch);
+      }
+      showFeedback('correct');
+      updateStatusBar();
+      lockAnswering = true;
+      setTimeout(advanceTraining1, CORRECT_ADVANCE_DELAY_MS);
+    } else {
+      Scoring.applyIncorrect(state);
+      showFeedback('incorrect');
+      updateStatusBar();
+    }
+  }
+
+  function advanceTraining1() {
+    var nextIndex = state.round.currentIndex + 1;
+    if (nextIndex >= state.round.notes.length) {
+      completeRound();
+      return;
+    }
+    state.round.currentIndex = nextIndex;
+    staffRenderer.setActiveNote(nextIndex);
+    setCurrentQuestionFromIndex(nextIndex);
+    clearFeedback();
+    lockAnswering = false;
+  }
+
+  // ---------- Training 2: Note -> Staff ----------
+
+  function showTraining2Target() {
+    var note = Music.describePitch(state.currentQuestion.pitch);
+    els.training2Target.textContent = Music.displayName(note, state.settings.namingSystem, true);
+  }
+
+  function startTraining2() {
+    els.training1Controls.hidden = true;
+    els.training2Prompt.hidden = false;
+    els.training2Instruction.hidden = false;
+
+    var width = els.staffContainer.clientWidth || 800;
+    staffRenderer.renderEmpty(width);
+
+    clearFeedback();
+    setCurrentQuestionFromIndex(state.round.currentIndex);
+    showTraining2Target();
+    lockAnswering = false;
+    staffRenderer.enableInteraction({ onClick: handleTraining2Click });
+  }
+
+  function handleTraining2Click(clickedStaffIndex) {
+    if (lockAnswering || state.round.completed) return;
+    var isCorrect = clickedStaffIndex === state.currentQuestion.staffIndex;
+
+    if (isCorrect) {
+      Scoring.applyCorrect(state);
+      showFeedback('correct');
+      updateStatusBar();
+      lockAnswering = true;
+      staffRenderer.disableInteraction();
+      if (state.settings.soundEnabled) Audio2.playPitch(state.currentQuestion.pitch);
+      staffRenderer.flashNote(state.currentQuestion.pitch, TRAINING2_FLASH_MS, advanceTraining2);
+    } else {
+      Scoring.applyIncorrect(state);
+      showFeedback('incorrect');
+      updateStatusBar();
+    }
+  }
+
+  function advanceTraining2() {
+    var nextIndex = state.round.currentIndex + 1;
+    if (nextIndex >= state.round.notes.length) {
+      completeRound();
+      return;
+    }
+    state.round.currentIndex = nextIndex;
+    setCurrentQuestionFromIndex(nextIndex);
+    showTraining2Target();
+    clearFeedback();
+    lockAnswering = false;
+    staffRenderer.enableInteraction({ onClick: handleTraining2Click });
+  }
+
+  // ---------- Round lifecycle ----------
+
+  function startRound() {
+    var width = els.staffContainer.clientWidth || 800;
+    var capacity = staffRenderer.computeNoteCapacity(width);
+    var notes = ExerciseGenerator.generateSequence(state.settings.difficulty, capacity);
+
+    state.round = {
+      notes: notes,
+      currentIndex: 0,
+      score: 0,
+      mistakes: 0,
+      completed: false
+    };
+
+    showScreen('training');
+    updateStatusBar();
+
+    if (state.settings.trainingType === 'staffToNote') {
+      startTraining1();
+    } else {
+      startTraining2();
+    }
+  }
+
+  function showFatalError(error) {
+    var container = document.getElementById('app') || document.body;
+    container.innerHTML =
+      '<div class="fatal-error">' +
+      '<h2>Music Note Trainer could not start</h2>' +
+      '<p>Something went wrong while loading the training screen. Reloading the page may help.</p>' +
+      '</div>';
+    if (window.console && console.error) console.error(error);
+  }
+
+  function init() {
+    try {
+      cacheElements();
+      state = window.AppState.createInitialState();
+      staffRenderer = new StaffRenderer(els.staffContainer);
+
+      settingsPanelApi = SettingsPanel.initSettingsPanel(els.settingsScreen, state, {
+        onStart: startRound
+      });
+
+      els.trainAgainBtn.addEventListener('click', function () {
+        showScreen('settings');
+      });
+
+      showScreen('settings');
+    } catch (error) {
+      showFatalError(error);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+</body>
+</html>
