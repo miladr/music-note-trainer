@@ -59,15 +59,30 @@ body {
 .status-bar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px 24px;
   font-size: 14px;
   color: var(--gray-dark);
 }
 
+.status-bar[hidden] {
+  display: none;
+}
+
+.status-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
 .status-group {
   display: flex;
   gap: 20px;
+}
+
+.stop-btn {
+  flex-shrink: 0;
 }
 
 /* ---------- Screens ---------- */
@@ -405,7 +420,8 @@ h2 {
 
   .status-bar {
     flex-direction: column;
-    gap: 4px;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .status-group {
@@ -429,14 +445,17 @@ h2 {
   <header class="app-header">
     <h1>Music Note Trainer</h1>
     <div id="training-status-bar" class="status-bar" hidden>
-      <div class="status-group">
-        <span id="status-training-type"></span>
-        <span id="status-level"></span>
+      <div class="status-info">
+        <div class="status-group">
+          <span id="status-training-type"></span>
+          <span id="status-level"></span>
+        </div>
+        <div class="status-group">
+          <span id="status-round-score"></span>
+          <span id="status-session-score"></span>
+        </div>
       </div>
-      <div class="status-group">
-        <span id="status-round-score"></span>
-        <span id="status-session-score"></span>
-      </div>
+      <button id="stop-training-btn" type="button" class="text-btn stop-btn">Stop</button>
     </div>
   </header>
 
@@ -1760,6 +1779,7 @@ h2 {
     els.statusLevel = document.getElementById('status-level');
     els.statusRoundScore = document.getElementById('status-round-score');
     els.statusSessionScore = document.getElementById('status-session-score');
+    els.stopTrainingBtn = document.getElementById('stop-training-btn');
 
     els.staffContainer = document.getElementById('staff-container');
     els.feedback = document.getElementById('feedback');
@@ -1960,6 +1980,7 @@ h2 {
   }
 
   function advanceTraining1() {
+    if (state.round.completed) return;
     var nextIndex = state.round.currentIndex + 1;
     if (nextIndex >= state.round.notes.length) {
       completeRound();
@@ -2014,6 +2035,7 @@ h2 {
   }
 
   function advanceTraining2() {
+    if (state.round.completed) return;
     var nextIndex = state.round.currentIndex + 1;
     if (nextIndex >= state.round.notes.length) {
       completeRound();
@@ -2052,6 +2074,20 @@ h2 {
     }
   }
 
+  // Abandons the round in progress and returns to Settings. Unlike
+  // finishing a round, this does not count toward rounds-completed or
+  // all-time notes-solved stats -- only the points already earned on
+  // answered notes (applied per-answer via Scoring) remain in the session
+  // score.
+  function stopTraining() {
+    if (state.view !== 'training') return;
+    state.round.completed = true;
+    lockAnswering = true;
+    staffRenderer.disableInteraction();
+    clearFeedback();
+    showScreen('settings');
+  }
+
   function showFatalError(error) {
     var container = document.getElementById('app') || document.body;
     container.innerHTML =
@@ -2075,6 +2111,8 @@ h2 {
       els.trainAgainBtn.addEventListener('click', function () {
         showScreen('settings');
       });
+
+      els.stopTrainingBtn.addEventListener('click', stopTraining);
 
       showScreen('settings');
     } catch (error) {
