@@ -264,10 +264,9 @@ h2 {
 }
 
 .touch-placeholder {
-  fill: none;
-  stroke: var(--gray-light);
+  fill: var(--gray-faint);
+  stroke: var(--gray-pale);
   stroke-width: 1;
-  stroke-dasharray: 3 2;
 }
 
 .hover-indicator {
@@ -1392,6 +1391,7 @@ h2 {
     this.height = this.computeHeight();
 
     this.container.innerHTML = '';
+    this._columns = null;
     var svg = el('svg', {
       width: this.width,
       height: this.height,
@@ -1513,22 +1513,47 @@ h2 {
     this._transientGroup = null;
     this._hoverEl = null;
     this._hoverLedgerGroup = null;
-    if (options && options.showPlaceholders) this._drawPlaceholders();
+    if (options && options.touchColumns) this._drawTouchColumns();
   };
 
-  // Outlines every selectable line and space position in the answer column
-  // so touch users can see where to tap.
-  StaffRenderer.prototype._drawPlaceholders = function () {
-    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+  // Splits the answer area into two columns -- line positions on the left,
+  // space positions on the right -- so neighbouring targets in a column are
+  // two steps apart and each target can be a full two steps tall.
+  StaffRenderer.prototype._drawTouchColumns = function () {
+    var centerX = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var gap = 55 * this.scale;
+    this._columns = { lineX: centerX - gap / 2, spaceX: centerX + gap / 2, midX: centerX };
+
+    var width = 64;
+    var height = this.halfStep * 2 - 2;
     var group = el('g', { class: 'touch-placeholders' });
     for (var idx = this.minIndexFull; idx <= this.maxIndexFull; idx++) {
-      group.appendChild(el('ellipse', {
-        // Kept shorter than one step so neighbouring targets don't touch.
-        cx: x, cy: this.yForIndex(idx), rx: this.noteRadiusX, ry: this.halfStep * 0.4,
+      var x = this._xForIndex(idx);
+      group.appendChild(el('rect', {
+        x: x - width / 2, y: this.yForIndex(idx) - height / 2,
+        width: width, height: height, rx: 8,
         class: 'touch-placeholder'
       }));
     }
-    this.svg.appendChild(group);
+    // Behind the staff lines so the lines stay visible through the targets.
+    this.svg.insertBefore(group, this.svg.firstChild);
+  };
+
+  StaffRenderer.prototype._xForIndex = function (staffIndex) {
+    if (!this._columns) return (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    return Music.isSpaceIndex(staffIndex) ? this._columns.spaceX : this._columns.lineX;
+  };
+
+  // With touch columns, the tap's side picks lines vs spaces and its height
+  // snaps to the nearest position of that kind.
+  StaffRenderer.prototype._indexForPoint = function (x, y) {
+    if (!this._columns) return this.clampToFullRange(this.indexForY(y));
+    var parity = x < this._columns.midX ? 0 : 1;
+    var raw = this.maxIndexFull + this.paddingSteps - y / this.halfStep;
+    var idx = Math.round((raw - parity) / 2) * 2 + parity;
+    while (idx < this.minIndexFull) idx += 2;
+    while (idx > this.maxIndexFull) idx -= 2;
+    return idx;
   };
 
   StaffRenderer.prototype._clearHover = function () {
@@ -1544,7 +1569,7 @@ h2 {
 
   StaffRenderer.prototype._drawHover = function (staffIndex) {
     this._clearHover();
-    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var x = this._xForIndex(staffIndex);
     var y = this.yForIndex(staffIndex);
 
     var hover = el('ellipse', {
@@ -1577,9 +1602,7 @@ h2 {
 
     function indexFromEvent(evt) {
       var rect = self.svg.getBoundingClientRect();
-      var y = evt.clientY - rect.top;
-      var idx = self.indexForY(y);
-      return self.clampToFullRange(idx);
+      return self._indexForPoint(evt.clientX - rect.left, evt.clientY - rect.top);
     }
 
     function onMove(evt) {
@@ -1626,7 +1649,7 @@ h2 {
       this._transientGroup = null;
     }
     var staffIndex = Music.staffIndexForPitch(pitch);
-    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var x = this._xForIndex(staffIndex);
     var group = this._drawNotehead(this.svg, x, staffIndex, 'transient');
     this._transientGroup = group;
 
@@ -2118,8 +2141,8 @@ h2 {
 
     var wide = state.settings.noteToStaffLayout === 'wide';
     var width = els.staffContainer.clientWidth || 800;
-    staffRenderer.setScale(wide ? 1.8 : 1);
-    staffRenderer.renderEmpty(width, { showPlaceholders: wide });
+    staffRenderer.setScale(wide ? 2.2 : 1);
+    staffRenderer.renderEmpty(width, { touchColumns: wide });
 
     clearFeedback();
     setCurrentQuestionFromIndex(state.round.currentIndex);
