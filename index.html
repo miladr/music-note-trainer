@@ -263,6 +263,13 @@ h2 {
   stroke: none;
 }
 
+.touch-placeholder {
+  fill: none;
+  stroke: var(--gray-light);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
 .hover-indicator {
   fill: var(--gray-faint);
   stroke: var(--gray-light);
@@ -492,6 +499,12 @@ h2 {
         <legend>Sound</legend>
         <label class="choice"><input type="radio" name="soundEnabled" value="on"> On</label>
         <label class="choice"><input type="radio" name="soundEnabled" value="off"> Off</label>
+      </fieldset>
+
+      <fieldset class="settings-field">
+        <legend>Note &rarr; Staff Layout</legend>
+        <label class="choice"><input type="radio" name="noteToStaffLayout" value="standard"> Standard</label>
+        <label class="choice"><input type="radio" name="noteToStaffLayout" value="wide"> Wide lines with touch targets</label>
       </fieldset>
 
       <button id="train-now-btn" class="primary-btn">Train Now</button>
@@ -929,7 +942,8 @@ h2 {
     difficulty: 3,
     namingSystem: 'letter',
     noteButtonOrder: 'fixed',
-    soundEnabled: true
+    soundEnabled: true,
+    noteToStaffLayout: 'standard'
   };
 
   var DEFAULT_STATS = {
@@ -1321,14 +1335,10 @@ h2 {
     this.maxIndexFull = Music.staffIndexForPitch(Music.CONFIG.MAX_PITCH);
 
     this.paddingSteps = 3;
-    this.halfStep = 9; // px per diatonic step
-    this.clefWidth = 64;
     this.leftMargin = 24;
     this.rightMargin = 24;
     this.minNoteSpacing = 56;
-    this.noteRadiusX = 7.5;
-    this.noteRadiusY = 6;
-    this.ledgerHalfWidth = 13;
+    this.setScale(1);
 
     this.svg = null;
     this.width = 0;
@@ -1336,6 +1346,19 @@ h2 {
     this.noteEls = [];
     this._interactionHandlers = null;
   }
+
+  // Scales the vertical line spacing and everything drawn relative to it.
+  // Training 2's "wide" layout uses a larger scale so each line/space is a
+  // bigger touch target.
+  StaffRenderer.prototype.setScale = function (scale) {
+    this.scale = scale;
+    this.halfStep = 9 * scale; // px per diatonic step
+    this.clefWidth = 64 * scale;
+    this.clefFontSize = 58 * scale;
+    this.noteRadiusX = 7.5 * scale;
+    this.noteRadiusY = 6 * scale;
+    this.ledgerHalfWidth = 13 * scale;
+  };
 
   StaffRenderer.prototype.computeHeight = function () {
     return (this.maxIndexFull - this.minIndexFull + this.paddingSteps * 2) * this.halfStep;
@@ -1396,6 +1419,7 @@ h2 {
       y: clefY,
       class: 'staff-clef'
     });
+    clefText.style.fontSize = this.clefFontSize + 'px';
     clefText.textContent = '𝄞'; // MUSICAL SYMBOL G CLEF (surrogate pair)
     svg.appendChild(clefText);
 
@@ -1484,11 +1508,27 @@ h2 {
   /**
    * Renders an empty staff ready for click-based interaction (Training 2).
    */
-  StaffRenderer.prototype.renderEmpty = function (widthPx) {
+  StaffRenderer.prototype.renderEmpty = function (widthPx, options) {
     this._buildBase(widthPx);
     this._transientGroup = null;
     this._hoverEl = null;
     this._hoverLedgerGroup = null;
+    if (options && options.showPlaceholders) this._drawPlaceholders();
+  };
+
+  // Outlines every selectable line and space position in the answer column
+  // so touch users can see where to tap.
+  StaffRenderer.prototype._drawPlaceholders = function () {
+    var x = (this.noteAreaStartX + this.noteAreaEndX) / 2;
+    var group = el('g', { class: 'touch-placeholders' });
+    for (var idx = this.minIndexFull; idx <= this.maxIndexFull; idx++) {
+      group.appendChild(el('ellipse', {
+        // Kept shorter than one step so neighbouring targets don't touch.
+        cx: x, cy: this.yForIndex(idx), rx: this.noteRadiusX, ry: this.halfStep * 0.4,
+        class: 'touch-placeholder'
+      }));
+    }
+    this.svg.appendChild(group);
   };
 
   StaffRenderer.prototype._clearHover = function () {
@@ -1691,6 +1731,7 @@ h2 {
     var namingSystemInputs = root.querySelectorAll('input[name="namingSystem"]');
     var noteButtonOrderInputs = root.querySelectorAll('input[name="noteButtonOrder"]');
     var soundInputs = root.querySelectorAll('input[name="soundEnabled"]');
+    var noteToStaffLayoutInputs = root.querySelectorAll('input[name="noteToStaffLayout"]');
     var trainNowBtn = root.querySelector('#train-now-btn');
     var resetProgressBtn = root.querySelector('#reset-progress-btn');
     var statsEl = root.querySelector('#alltime-stats');
@@ -1709,6 +1750,9 @@ h2 {
       });
       soundInputs.forEach(function (input) {
         input.checked = (input.value === 'on') === !!state.settings.soundEnabled;
+      });
+      noteToStaffLayoutInputs.forEach(function (input) {
+        input.checked = input.value === state.settings.noteToStaffLayout;
       });
     }
 
@@ -1759,6 +1803,15 @@ h2 {
       input.addEventListener('change', function () {
         if (input.checked) {
           state.settings.soundEnabled = input.value === 'on';
+          persist();
+        }
+      });
+    });
+
+    noteToStaffLayoutInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.noteToStaffLayout = input.value;
           persist();
         }
       });
@@ -2063,8 +2116,10 @@ h2 {
     els.training2Prompt.hidden = false;
     els.training2Instruction.hidden = false;
 
+    var wide = state.settings.noteToStaffLayout === 'wide';
     var width = els.staffContainer.clientWidth || 800;
-    staffRenderer.renderEmpty(width);
+    staffRenderer.setScale(wide ? 1.8 : 1);
+    staffRenderer.renderEmpty(width, { showPlaceholders: wide });
 
     clearFeedback();
     setCurrentQuestionFromIndex(state.round.currentIndex);
@@ -2111,6 +2166,7 @@ h2 {
 
   function startRound() {
     var width = els.staffContainer.clientWidth || 800;
+    staffRenderer.setScale(1);
     var capacity = staffRenderer.computeNoteCapacity(width);
     var notes = ExerciseGenerator.generateSequence(state.settings.difficulty, capacity);
 
