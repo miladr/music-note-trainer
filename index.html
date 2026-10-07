@@ -489,6 +489,12 @@ h2 {
       </fieldset>
 
       <fieldset class="settings-field">
+        <legend>Staff Spacing</legend>
+        <label class="choice"><input type="radio" name="staffSpacing" value="normal"> Normal</label>
+        <label class="choice"><input type="radio" name="staffSpacing" value="large"> Large (touch-friendly)</label>
+      </fieldset>
+
+      <fieldset class="settings-field">
         <legend>Sound</legend>
         <label class="choice"><input type="radio" name="soundEnabled" value="on"> On</label>
         <label class="choice"><input type="radio" name="soundEnabled" value="off"> Off</label>
@@ -929,6 +935,7 @@ h2 {
     difficulty: 3,
     namingSystem: 'letter',
     noteButtonOrder: 'fixed',
+    staffSpacing: 'normal',
     soundEnabled: true
   };
 
@@ -1321,21 +1328,51 @@ h2 {
     this.maxIndexFull = Music.staffIndexForPitch(Music.CONFIG.MAX_PITCH);
 
     this.paddingSteps = 3;
-    this.halfStep = 9; // px per diatonic step
-    this.clefWidth = 64;
-    this.leftMargin = 24;
-    this.rightMargin = 24;
-    this.minNoteSpacing = 56;
-    this.noteRadiusX = 7.5;
-    this.noteRadiusY = 6;
-    this.ledgerHalfWidth = 13;
+
+    // Base (normal-scale) geometry in px; setScale() multiplies all of it
+    // by a factor so a "large" staff setting can make lines/click targets
+    // touch-friendly without duplicating layout logic.
+    this.BASE_HALF_STEP = 9; // px per diatonic step
+    this.BASE_CLEF_WIDTH = 64;
+    this.BASE_LEFT_MARGIN = 24;
+    this.BASE_RIGHT_MARGIN = 24;
+    this.BASE_MIN_NOTE_SPACING = 56;
+    this.BASE_NOTE_RADIUS_X = 7.5;
+    this.BASE_NOTE_RADIUS_Y = 6;
+    this.BASE_LEDGER_HALF_WIDTH = 13;
+    this.BASE_HIGHLIGHT_PADDING = 6;
+    this.BASE_HOVER_PADDING = 3;
+    this.BASE_CLEF_FONT_SIZE = 58;
 
     this.svg = null;
     this.width = 0;
-    this.height = this.computeHeight();
     this.noteEls = [];
     this._interactionHandlers = null;
+
+    this.setScale(1);
   }
+
+  /**
+   * Scales all staff geometry (line spacing, note/ledger size, margins) by
+   * the given factor. A larger scale makes Note -> Staff click targets
+   * bigger and easier to hit on touch devices (requirement: touch-friendly
+   * staff spacing setting).
+   */
+  StaffRenderer.prototype.setScale = function (scale) {
+    this.scale = scale;
+    this.halfStep = this.BASE_HALF_STEP * scale;
+    this.clefWidth = this.BASE_CLEF_WIDTH * scale;
+    this.leftMargin = this.BASE_LEFT_MARGIN * scale;
+    this.rightMargin = this.BASE_RIGHT_MARGIN * scale;
+    this.minNoteSpacing = this.BASE_MIN_NOTE_SPACING * scale;
+    this.noteRadiusX = this.BASE_NOTE_RADIUS_X * scale;
+    this.noteRadiusY = this.BASE_NOTE_RADIUS_Y * scale;
+    this.ledgerHalfWidth = this.BASE_LEDGER_HALF_WIDTH * scale;
+    this.highlightPadding = this.BASE_HIGHLIGHT_PADDING * scale;
+    this.hoverPadding = this.BASE_HOVER_PADDING * scale;
+    this.clefFontSize = this.BASE_CLEF_FONT_SIZE * scale;
+    this.height = this.computeHeight();
+  };
 
   StaffRenderer.prototype.computeHeight = function () {
     return (this.maxIndexFull - this.minIndexFull + this.paddingSteps * 2) * this.halfStep;
@@ -1396,6 +1433,7 @@ h2 {
       y: clefY,
       class: 'staff-clef'
     });
+    clefText.style.fontSize = this.clefFontSize + 'px';
     clefText.textContent = '𝄞'; // MUSICAL SYMBOL G CLEF (surrogate pair)
     svg.appendChild(clefText);
 
@@ -1450,7 +1488,7 @@ h2 {
       if (i === activeIndex) {
         var y = this.yForIndex(staffIndex);
         highlightCircle = el('circle', {
-          cx: x, cy: y, r: this.noteRadiusX + 6,
+          cx: x, cy: y, r: this.noteRadiusX + this.highlightPadding,
           class: 'active-note-highlight'
         });
         svg.appendChild(highlightCircle);
@@ -1473,7 +1511,7 @@ h2 {
     if (entry) {
       var y = this.yForIndex(entry.staffIndex);
       var circle = el('circle', {
-        cx: entry.x, cy: y, r: this.noteRadiusX + 6,
+        cx: entry.x, cy: y, r: this.noteRadiusX + this.highlightPadding,
         class: 'active-note-highlight'
       });
       this.svg.insertBefore(circle, entry.group);
@@ -1508,7 +1546,7 @@ h2 {
     var y = this.yForIndex(staffIndex);
 
     var hover = el('ellipse', {
-      cx: x, cy: y, rx: this.noteRadiusX + 3, ry: this.noteRadiusY + 3,
+      cx: x, cy: y, rx: this.noteRadiusX + this.hoverPadding, ry: this.noteRadiusY + this.hoverPadding,
       class: 'hover-indicator'
     });
     this.svg.appendChild(hover);
@@ -1690,6 +1728,7 @@ h2 {
     var difficultyValue = root.querySelector('#difficulty-value');
     var namingSystemInputs = root.querySelectorAll('input[name="namingSystem"]');
     var noteButtonOrderInputs = root.querySelectorAll('input[name="noteButtonOrder"]');
+    var staffSpacingInputs = root.querySelectorAll('input[name="staffSpacing"]');
     var soundInputs = root.querySelectorAll('input[name="soundEnabled"]');
     var trainNowBtn = root.querySelector('#train-now-btn');
     var resetProgressBtn = root.querySelector('#reset-progress-btn');
@@ -1706,6 +1745,9 @@ h2 {
       });
       noteButtonOrderInputs.forEach(function (input) {
         input.checked = input.value === state.settings.noteButtonOrder;
+      });
+      staffSpacingInputs.forEach(function (input) {
+        input.checked = input.value === state.settings.staffSpacing;
       });
       soundInputs.forEach(function (input) {
         input.checked = (input.value === 'on') === !!state.settings.soundEnabled;
@@ -1750,6 +1792,15 @@ h2 {
       input.addEventListener('change', function () {
         if (input.checked) {
           state.settings.noteButtonOrder = input.value;
+          persist();
+        }
+      });
+    });
+
+    staffSpacingInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.staffSpacing = input.value;
           persist();
         }
       });
@@ -1819,6 +1870,8 @@ h2 {
   var PIANO_MAX_PITCH = 'C6';
   var CORRECT_ADVANCE_DELAY_MS = 350;
   var TRAINING2_FLASH_MS = 700;
+  var STAFF_SCALE_NORMAL = 1;
+  var STAFF_SCALE_LARGE = 2;
 
   var state;
   var staffRenderer;
@@ -2002,11 +2055,16 @@ h2 {
     });
   }
 
+  function getStaffScale() {
+    return state.settings.staffSpacing === 'large' ? STAFF_SCALE_LARGE : STAFF_SCALE_NORMAL;
+  }
+
   function startTraining1() {
     els.training1Controls.hidden = false;
     els.training2Prompt.hidden = true;
     els.training2Instruction.hidden = true;
 
+    staffRenderer.setScale(getStaffScale());
     var width = els.staffContainer.clientWidth || 800;
     staffRenderer.renderSequence(width, state.round.notes, state.round.currentIndex);
 
@@ -2063,6 +2121,7 @@ h2 {
     els.training2Prompt.hidden = false;
     els.training2Instruction.hidden = false;
 
+    staffRenderer.setScale(getStaffScale());
     var width = els.staffContainer.clientWidth || 800;
     staffRenderer.renderEmpty(width);
 
@@ -2110,6 +2169,7 @@ h2 {
   // ---------- Round lifecycle ----------
 
   function startRound() {
+    staffRenderer.setScale(getStaffScale());
     var width = els.staffContainer.clientWidth || 800;
     var capacity = staffRenderer.computeNoteCapacity(width);
     var notes = ExerciseGenerator.generateSequence(state.settings.difficulty, capacity);
