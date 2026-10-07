@@ -159,6 +159,13 @@ h2 {
   outline-offset: 2px;
 }
 
+.midi-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--gray-mid);
+  min-height: 20px;
+}
+
 .settings-footer {
   margin-top: 32px;
   padding-top: 16px;
@@ -501,6 +508,13 @@ h2 {
       </fieldset>
 
       <fieldset class="settings-field">
+        <legend>MIDI Keyboard (Staff &rarr; Note)</legend>
+        <label class="choice"><input type="radio" name="midiEnabled" value="off"> Off</label>
+        <label class="choice"><input type="radio" name="midiEnabled" value="on"> On</label>
+        <p id="midi-status" class="midi-status" aria-live="polite"></p>
+      </fieldset>
+
+      <fieldset class="settings-field">
         <legend>Note &rarr; Staff Layout</legend>
         <label class="choice"><input type="radio" name="noteToStaffLayout" value="standard"> Standard</label>
         <label class="choice"><input type="radio" name="noteToStaffLayout" value="wide"> Wide lines with touch targets</label>
@@ -694,7 +708,21 @@ h2 {
     return Math.max(min, Math.min(max, value));
   }
 
+  var NATURAL_LETTER_BY_SEMITONE = { 0: 'C', 2: 'D', 4: 'E', 5: 'F', 7: 'G', 9: 'A', 11: 'B' };
+
+  /**
+   * Converts a MIDI note number (60 = middle C = C4) to a natural pitch
+   * string such as "C4". Returns null for sharps/flats, which the app
+   * doesn't use.
+   */
+  function pitchForMidiNote(midiNote) {
+    var letter = NATURAL_LETTER_BY_SEMITONE[midiNote % 12];
+    if (!letter) return null;
+    return letter + (Math.floor(midiNote / 12) - 1);
+  }
+
   global.Music = {
+    pitchForMidiNote: pitchForMidiNote,
     CONFIG: CONFIG,
     NATURAL_LETTERS: NATURAL_LETTERS,
     SOLFEGE_NAMES: SOLFEGE_NAMES,
@@ -942,6 +970,7 @@ h2 {
     namingSystem: 'letter',
     noteButtonOrder: 'fixed',
     soundEnabled: true,
+    midiEnabled: false,
     noteToStaffLayout: 'standard'
   };
 
@@ -1289,8 +1318,16 @@ h2 {
     }, 150);
   }
 
+  // Lights up an on-screen key for input that didn't come from clicking it
+  // (e.g. a MIDI keyboard). No-op if the pitch is outside the drawn range.
+  function pressKey(container, pitch) {
+    var keyEl = container.querySelector('.piano-key-white[data-pitch="' + pitch + '"]');
+    if (keyEl) pressVisual(keyEl);
+  }
+
   global.Piano = {
-    renderPiano: renderPiano
+    renderPiano: renderPiano,
+    pressKey: pressKey
   };
 })(window);
 </script>
@@ -1677,6 +1714,106 @@ h2 {
 
 <script>
 /**
+ * midi.js
+ *
+ * Web MIDI input so a connected keyboard can answer Staff -> Note like the
+ * on-screen piano. Supported in Chrome, Edge and Opera; unsupported browsers
+ * (e.g. Safari) get a status message and the rest of the app is unaffected.
+ * Needs a secure context (https or localhost).
+ */
+
+(function (global) {
+  'use strict';
+
+  var NOTE_ON = 0x90;
+
+  var access = null;
+  var enabled = false;
+  var onNote = null;
+  var onStatus = null;
+
+  function isSupported() {
+    return !!(navigator.requestMIDIAccess);
+  }
+
+  function report(message) {
+    if (onStatus) onStatus(message);
+  }
+
+  function handleMessage(event) {
+    var data = event.data;
+    if (!enabled || !onNote || !data || data.length < 3) return;
+    // Note-on with velocity 0 is a note-off by MIDI convention.
+    if ((data[0] & 0xf0) === NOTE_ON && data[2] > 0) onNote(data[1]);
+  }
+
+  function inputNames() {
+    var names = [];
+    if (access) {
+      access.inputs.forEach(function (input) {
+        if (input.state === 'connected') names.push(input.name || 'Unnamed device');
+      });
+    }
+    return names;
+  }
+
+  // Re-run on every hot-plug so newly connected devices get a listener.
+  function refresh() {
+    if (!access) return;
+    access.inputs.forEach(function (input) {
+      input.onmidimessage = enabled ? handleMessage : null;
+    });
+    if (!enabled) return;
+    var names = inputNames();
+    report(names.length
+      ? 'Connected: ' + names.join(', ')
+      : 'No MIDI device found. Connect your keyboard and it will appear here.');
+  }
+
+  function enable() {
+    enabled = true;
+    if (!isSupported()) {
+      enabled = false;
+      report('MIDI is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    if (access) {
+      refresh();
+      return;
+    }
+    report('Requesting MIDI access...');
+    navigator.requestMIDIAccess({ sysex: false }).then(function (midiAccess) {
+      access = midiAccess;
+      access.onstatechange = refresh;
+      refresh();
+    }).catch(function () {
+      enabled = false;
+      report('MIDI access was blocked. Allow it in your browser\'s site settings and try again.');
+    });
+  }
+
+  function disable() {
+    enabled = false;
+    refresh();
+    report('');
+  }
+
+  function init(callbacks) {
+    onNote = callbacks.onNote;
+    onStatus = callbacks.onStatus;
+  }
+
+  global.Midi = {
+    init: init,
+    enable: enable,
+    disable: disable,
+    isSupported: isSupported
+  };
+})(window);
+</script>
+
+<script>
+/**
  * state.js
  *
  * Central application state (requirement #25). Training logic that mutates
@@ -1755,6 +1892,7 @@ h2 {
     var noteButtonOrderInputs = root.querySelectorAll('input[name="noteButtonOrder"]');
     var soundInputs = root.querySelectorAll('input[name="soundEnabled"]');
     var noteToStaffLayoutInputs = root.querySelectorAll('input[name="noteToStaffLayout"]');
+    var midiInputs = root.querySelectorAll('input[name="midiEnabled"]');
     var trainNowBtn = root.querySelector('#train-now-btn');
     var resetProgressBtn = root.querySelector('#reset-progress-btn');
     var statsEl = root.querySelector('#alltime-stats');
@@ -1776,6 +1914,9 @@ h2 {
       });
       noteToStaffLayoutInputs.forEach(function (input) {
         input.checked = input.value === state.settings.noteToStaffLayout;
+      });
+      midiInputs.forEach(function (input) {
+        input.checked = (input.value === 'on') === !!state.settings.midiEnabled;
       });
     }
 
@@ -1827,6 +1968,16 @@ h2 {
         if (input.checked) {
           state.settings.soundEnabled = input.value === 'on';
           persist();
+        }
+      });
+    });
+
+    midiInputs.forEach(function (input) {
+      input.addEventListener('change', function () {
+        if (input.checked) {
+          state.settings.midiEnabled = input.value === 'on';
+          persist();
+          if (callbacks.onMidiChange) callbacks.onMidiChange(state.settings.midiEnabled);
         }
       });
     });
@@ -1890,6 +2041,7 @@ h2 {
   var Audio2 = window.Audio2;
   var StaffRenderer = window.StaffRenderer;
   var SettingsPanel = window.SettingsPanel;
+  var Midi = window.Midi;
 
   var PIANO_MIN_PITCH = 'C3';
   var PIANO_MAX_PITCH = 'C6';
@@ -1921,6 +2073,7 @@ h2 {
     els.training1Controls = document.getElementById('training1-controls');
     els.noteButtons = document.getElementById('note-buttons');
     els.pianoContainer = document.getElementById('piano-container');
+    els.midiStatus = document.getElementById('midi-status');
 
     els.training2Prompt = document.getElementById('training2-prompt');
     els.training2Target = document.getElementById('training2-target');
@@ -2093,6 +2246,17 @@ h2 {
     lockAnswering = false;
   }
 
+  // A MIDI key answers like the on-screen piano: sharps/flats and Note ->
+  // Staff mode are ignored; sound follows the Sound setting.
+  function handleMidiNote(midiNote) {
+    if (state.view !== 'training' || state.settings.trainingType !== 'staffToNote') return;
+    var pitch = Music.pitchForMidiNote(midiNote);
+    if (!pitch) return;
+    if (state.settings.soundEnabled) Audio2.playPitch(pitch);
+    Piano.pressKey(els.pianoContainer, pitch);
+    handleTraining1Answer(Music.parsePitch(pitch).letter, { viaPiano: true });
+  }
+
   function handleTraining1Answer(pitchClass, options) {
     if (lockAnswering || state.round.completed) return;
     var isCorrect = pitchClass === state.currentQuestion.pitchClass;
@@ -2241,9 +2405,22 @@ h2 {
       state = window.AppState.createInitialState();
       staffRenderer = new StaffRenderer(els.staffContainer);
 
-      settingsPanelApi = SettingsPanel.initSettingsPanel(els.settingsScreen, state, {
-        onStart: startRound
+      Midi.init({
+        onNote: handleMidiNote,
+        onStatus: function (message) {
+          els.midiStatus.textContent = message;
+        }
       });
+
+      settingsPanelApi = SettingsPanel.initSettingsPanel(els.settingsScreen, state, {
+        onStart: startRound,
+        onMidiChange: function (isOn) {
+          if (isOn) Midi.enable();
+          else Midi.disable();
+        }
+      });
+
+      if (state.settings.midiEnabled) Midi.enable();
 
       els.trainAgainBtn.addEventListener('click', function () {
         showScreen('settings');
