@@ -224,6 +224,23 @@ h2 {
   font-weight: 600;
 }
 
+.staff-container[hidden],
+.note-buttons[hidden] {
+  display: none;
+}
+
+.chord-line {
+  min-height: 24px;
+  margin-top: 6px;
+  font-size: 15px;
+  color: var(--gray-mid);
+}
+
+.chord-line strong {
+  color: var(--black);
+  letter-spacing: 0.08em;
+}
+
 .staff-container {
   width: 100%;
   display: flex;
@@ -382,6 +399,37 @@ h2 {
   outline-offset: -3px;
 }
 
+.piano-key-white.hinted {
+  background: var(--gray-pale);
+}
+
+.piano-key-white.hinted.pressed {
+  background: var(--gray-light);
+}
+
+.key-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--black);
+  pointer-events: none;
+}
+
+.key-label small {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chord-hint-btn {
+  margin-top: 8px;
+}
+
 .piano-key-black {
   background: var(--black);
   border: 1px solid var(--black);
@@ -481,6 +529,7 @@ h2 {
         <legend>Training Type</legend>
         <label class="choice"><input type="radio" name="trainingType" value="staffToNote"> Staff &rarr; Note</label>
         <label class="choice"><input type="radio" name="trainingType" value="noteToStaff"> Note &rarr; Staff</label>
+        <label class="choice"><input type="radio" name="trainingType" value="chordToPiano"> Chord &rarr; Piano</label>
       </fieldset>
 
       <fieldset class="settings-field">
@@ -508,7 +557,7 @@ h2 {
       </fieldset>
 
       <fieldset class="settings-field">
-        <legend>MIDI Keyboard (Staff &rarr; Note)</legend>
+        <legend>MIDI Keyboard</legend>
         <label class="choice"><input type="radio" name="midiEnabled" value="off"> Off</label>
         <label class="choice"><input type="radio" name="midiEnabled" value="on"> On</label>
         <p id="midi-status" class="midi-status" aria-live="polite"></p>
@@ -533,6 +582,15 @@ h2 {
       <div id="training2-prompt" class="training2-prompt" hidden>
         <div class="prompt-label">Find:</div>
         <div id="training2-target" class="prompt-target"></div>
+      </div>
+
+      <div id="chord-prompt" class="training2-prompt" hidden>
+        <div class="prompt-label">Play:</div>
+        <div id="chord-name" class="prompt-target"></div>
+        <div id="chord-hint" class="chord-line"></div>
+        <button id="chord-hint-btn" type="button" class="text-btn chord-hint-btn" aria-pressed="false">Hint</button>
+        <div id="chord-hint-names" class="chord-line"></div>
+        <div id="chord-played" class="chord-line" aria-live="polite"></div>
       </div>
 
       <div id="staff-container" class="staff-container"></div>
@@ -977,6 +1035,7 @@ h2 {
   var DEFAULT_STATS = {
     totalRoundsCompleted: 0,
     totalNotesSolved: 0,
+    totalChordsSolved: 0,
     totalMistakes: 0
   };
 
@@ -1325,9 +1384,41 @@ h2 {
     if (keyEl) pressVisual(keyEl);
   }
 
+  // Highlights the keys in one octave whose note name is in pitchClasses and
+  // writes that name on the key. With includeSolfege each key also shows its
+  // solfege name underneath.
+  function markKeys(container, pitchClasses, includeSolfege, octave) {
+    clearMarks(container);
+    container.querySelectorAll('.piano-key-white').forEach(function (keyEl) {
+      var letter = keyEl.dataset.pitchClass;
+      if (pitchClasses.indexOf(letter) === -1) return;
+      if (Music.parsePitch(keyEl.dataset.pitch).octave !== octave) return;
+      keyEl.classList.add('hinted');
+      var label = document.createElement('span');
+      label.className = 'key-label';
+      label.appendChild(document.createTextNode(letter));
+      if (includeSolfege) {
+        var small = document.createElement('small');
+        small.textContent = Music.SOLFEGE_NAMES[letter];
+        label.appendChild(small);
+      }
+      keyEl.appendChild(label);
+    });
+  }
+
+  function clearMarks(container) {
+    container.querySelectorAll('.piano-key-white.hinted').forEach(function (keyEl) {
+      keyEl.classList.remove('hinted');
+      var label = keyEl.querySelector('.key-label');
+      if (label) label.remove();
+    });
+  }
+
   global.Piano = {
     renderPiano: renderPiano,
-    pressKey: pressKey
+    pressKey: pressKey,
+    markKeys: markKeys,
+    clearMarks: clearMarks
   };
 })(window);
 </script>
@@ -1714,6 +1805,88 @@ h2 {
 
 <script>
 /**
+ * chords.js
+ *
+ * Chord data and round generation for Chord -> Piano. Chords are the
+ * diatonic triads and seventh chords of C major, so every chord is made of
+ * natural notes only (no accidentals needed).
+ */
+
+(function (global) {
+  'use strict';
+
+  var SCALE = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  var TRIAD_QUALITY = { C: 'major', D: 'minor', E: 'minor', F: 'major', G: 'major', A: 'minor', B: 'dim' };
+  var SEVENTH_QUALITY = { C: 'maj7', D: 'm7', E: 'm7', F: 'maj7', G: '7', A: 'm7', B: 'm7b5' };
+  var SUFFIX = { major: '', minor: 'm', dim: '°', maj7: 'maj7', m7: 'm7', '7': '7', m7b5: 'm7♭5' };
+
+  function build(rootIndex, quality, size) {
+    var notes = [];
+    for (var i = 0; i < size; i++) notes.push(SCALE[(rootIndex + i * 2) % 7]);
+    var root = SCALE[rootIndex];
+    return { id: root + SUFFIX[quality], root: root, quality: quality, notes: notes };
+  }
+
+  var TRIADS = SCALE.map(function (root, i) { return build(i, TRIAD_QUALITY[root], 3); });
+  var SEVENTHS = SCALE.map(function (root, i) { return build(i, SEVENTH_QUALITY[root], 4); });
+  var BY_ID = {};
+  TRIADS.concat(SEVENTHS).forEach(function (chord) { BY_ID[chord.id] = chord; });
+
+  function pick(list, ids) {
+    return list.filter(function (chord) { return ids.indexOf(chord.root) !== -1; });
+  }
+
+  /**
+   * Chord pool by difficulty level: starts with the three primary chords,
+   * grows to all triads, then adds seventh chords.
+   */
+  function poolForLevel(level) {
+    if (level <= 1) return pick(TRIADS, ['C', 'F', 'G']);
+    if (level === 2) return pick(TRIADS, ['C', 'F', 'G', 'A', 'D']);
+    if (level === 3) return TRIADS;
+    if (level === 4) return TRIADS.concat(pick(SEVENTHS, ['C', 'F', 'G']));
+    if (level === 5) return TRIADS.concat(SEVENTHS);
+    return TRIADS.concat(SEVENTHS);
+  }
+
+  // Beginner levels show the chord's notes as a hint under its name.
+  function showsHint(level) {
+    return level <= 2;
+  }
+
+  function generateSequence(level, count) {
+    var pool = poolForLevel(level);
+    var ids = [];
+    var last = null;
+    for (var i = 0; i < count; i++) {
+      var choices = pool.filter(function (chord) { return chord.id !== last; });
+      var chord = choices[Math.floor(Math.random() * choices.length)];
+      ids.push(chord.id);
+      last = chord.id;
+    }
+    return ids;
+  }
+
+  function nameFor(chord, namingSystem) {
+    if (namingSystem === 'solfege') {
+      var suffix = SUFFIX[chord.quality];
+      return global.Music.SOLFEGE_NAMES[chord.root] + (suffix ? ' ' + suffix : '');
+    }
+    return chord.id;
+  }
+
+  global.Chords = {
+    byId: function (id) { return BY_ID[id]; },
+    poolForLevel: poolForLevel,
+    showsHint: showsHint,
+    generateSequence: generateSequence,
+    nameFor: nameFor
+  };
+})(window);
+</script>
+
+<script>
+/**
  * midi.js
  *
  * Web MIDI input so a connected keyboard can answer Staff -> Note like the
@@ -1927,7 +2100,8 @@ h2 {
     function renderStats() {
       var stats = state.persistentStats;
       statsEl.textContent = 'All-time: ' + stats.totalRoundsCompleted + ' rounds completed, ' +
-        stats.totalNotesSolved + ' notes solved.';
+        stats.totalNotesSolved + ' notes solved' +
+        (stats.totalChordsSolved ? ', ' + stats.totalChordsSolved + ' chords solved.' : '.');
     }
 
     trainingTypeInputs.forEach(function (input) {
@@ -2042,11 +2216,15 @@ h2 {
   var StaffRenderer = window.StaffRenderer;
   var SettingsPanel = window.SettingsPanel;
   var Midi = window.Midi;
+  var Chords = window.Chords;
 
   var PIANO_MIN_PITCH = 'C3';
   var PIANO_MAX_PITCH = 'C6';
   var CORRECT_ADVANCE_DELAY_MS = 350;
   var TRAINING2_FLASH_MS = 700;
+  var CHORDS_PER_ROUND = 8;
+  var CHORD_IDLE_MS = 2500;
+  var CHORD_EXTRA_NOTE_GRACE_MS = 300;
 
   var state;
   var staffRenderer;
@@ -2078,6 +2256,12 @@ h2 {
     els.training2Prompt = document.getElementById('training2-prompt');
     els.training2Target = document.getElementById('training2-target');
     els.training2Instruction = document.getElementById('training2-instruction');
+    els.chordPrompt = document.getElementById('chord-prompt');
+    els.chordName = document.getElementById('chord-name');
+    els.chordHint = document.getElementById('chord-hint');
+    els.chordPlayed = document.getElementById('chord-played');
+    els.chordHintBtn = document.getElementById('chord-hint-btn');
+    els.chordHintNames = document.getElementById('chord-hint-names');
 
     els.resultsList = document.getElementById('results-list');
     els.trainAgainBtn = document.getElementById('train-again-btn');
@@ -2093,7 +2277,8 @@ h2 {
 
   var TRAINING_TYPE_LABELS = {
     staffToNote: 'Staff → Note',
-    noteToStaff: 'Note → Staff'
+    noteToStaff: 'Note → Staff',
+    chordToPiano: 'Chord → Piano'
   };
 
   function updateStatusBar() {
@@ -2142,7 +2327,8 @@ h2 {
 
   function persistStatsAfterRound() {
     state.persistentStats.totalRoundsCompleted += 1;
-    state.persistentStats.totalNotesSolved += state.round.notes.length;
+    if (isChordMode()) state.persistentStats.totalChordsSolved += state.round.notes.length;
+    else state.persistentStats.totalNotesSolved += state.round.notes.length;
     state.persistentStats.totalMistakes += state.round.mistakes;
     Storage.saveStats(state.persistentStats);
   }
@@ -2158,7 +2344,7 @@ h2 {
     els.resultsList.innerHTML = '';
     var rows = [
       ['Difficulty level', String(state.settings.difficulty)],
-      ['Notes solved', String(state.round.notes.length)],
+      [isChordMode() ? 'Chords solved' : 'Notes solved', String(state.round.notes.length)],
       ['Mistakes', String(state.round.mistakes)],
       ['Round score', String(state.round.score)],
       ['Session score', String(state.session.score)]
@@ -2226,13 +2412,21 @@ h2 {
         if (state.settings.soundEnabled) Audio2.playPitch(pitch);
       },
       onNoteAnswer: function (pitchClass) {
-        handleTraining1Answer(pitchClass, { viaPiano: true });
+        if (isChordMode()) handleChordNote(pitchClass);
+        else handleTraining1Answer(pitchClass, { viaPiano: true });
       }
     });
   }
 
+  function isChordMode() {
+    return state.settings.trainingType === 'chordToPiano';
+  }
+
   function startTraining1() {
     els.training1Controls.hidden = false;
+    els.noteButtons.hidden = false;
+    els.staffContainer.hidden = false;
+    els.chordPrompt.hidden = true;
     els.training2Prompt.hidden = true;
     els.training2Instruction.hidden = true;
 
@@ -2249,12 +2443,153 @@ h2 {
   // A MIDI key answers like the on-screen piano: sharps/flats and Note ->
   // Staff mode are ignored; sound follows the Sound setting.
   function handleMidiNote(midiNote) {
-    if (state.view !== 'training' || state.settings.trainingType !== 'staffToNote') return;
+    var type = state.settings.trainingType;
+    if (state.view !== 'training' || type === 'noteToStaff') return;
     var pitch = Music.pitchForMidiNote(midiNote);
     if (!pitch) return;
     if (state.settings.soundEnabled) Audio2.playPitch(pitch);
     Piano.pressKey(els.pianoContainer, pitch);
-    handleTraining1Answer(Music.parsePitch(pitch).letter, { viaPiano: true });
+    var letter = Music.parsePitch(pitch).letter;
+    if (type === 'chordToPiano') handleChordNote(letter);
+    else handleTraining1Answer(letter, { viaPiano: true });
+  }
+
+  // ---------- Chord -> Piano ----------
+
+  var chordInput = { played: [], showingResult: false, idleTimer: null, ignoreUntil: 0 };
+
+  function noteLabel(letter) {
+    return state.settings.namingSystem === 'solfege' ? Music.SOLFEGE_NAMES[letter] : letter;
+  }
+
+  function resetChordInput() {
+    if (chordInput.idleTimer) clearTimeout(chordInput.idleTimer);
+    chordInput.idleTimer = null;
+    chordInput.played = [];
+    chordInput.showingResult = false;
+    chordInput.ignoreUntil = 0;
+    if (els.chordPlayed) els.chordPlayed.textContent = '';
+  }
+
+  function renderChordPlayed() {
+    els.chordPlayed.innerHTML = '';
+    if (!chordInput.played.length) return;
+    els.chordPlayed.appendChild(document.createTextNode('You played: '));
+    var strong = document.createElement('strong');
+    strong.textContent = chordInput.played.map(noteLabel).join('  ');
+    els.chordPlayed.appendChild(strong);
+  }
+
+  // Hint: highlight the chord's keys (center octave only), label them, and give
+  // the chord's name in both naming systems. Free: it doesn't affect score.
+  function setChordHint(visible) {
+    els.chordHintBtn.textContent = visible ? 'Hide hint' : 'Hint';
+    els.chordHintBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+    if (!visible) {
+      els.chordHintNames.textContent = '';
+      Piano.clearMarks(els.pianoContainer);
+      return;
+    }
+    var chord = Chords.byId(state.currentQuestion.chordId);
+    els.chordHintNames.textContent = 'Chord name: ' + Chords.nameFor(chord, 'letter') +
+      ' (letters) \u00B7 ' + Chords.nameFor(chord, 'solfege') + ' (solf\u00E8ge)';
+    var centerOctave = Math.floor((Music.parsePitch(PIANO_MIN_PITCH).octave + Music.parsePitch(PIANO_MAX_PITCH).octave) / 2);
+    Piano.markKeys(els.pianoContainer, chord.notes, state.settings.namingSystem === 'solfege', centerOctave);
+  }
+
+  function toggleChordHint() {
+    setChordHint(els.chordHintBtn.getAttribute('aria-pressed') !== 'true');
+  }
+
+  function showChordQuestion() {
+    var chord = Chords.byId(state.currentQuestion.chordId);
+    els.chordName.textContent = Chords.nameFor(chord, state.settings.namingSystem);
+    els.chordHint.textContent = Chords.showsHint(state.settings.difficulty)
+      ? 'Notes: ' + chord.notes.map(noteLabel).join(' \u2013 ')
+      : '';
+    setChordHint(false);
+    resetChordInput();
+  }
+
+  function startChordRound() {
+    state.round = {
+      notes: Chords.generateSequence(state.settings.difficulty, CHORDS_PER_ROUND),
+      currentIndex: 0,
+      score: 0,
+      mistakes: 0,
+      completed: false
+    };
+    state.currentQuestion = { chordId: state.round.notes[0] };
+
+    showScreen('training');
+    updateStatusBar();
+
+    els.training1Controls.hidden = false;
+    els.noteButtons.hidden = true;
+    els.staffContainer.hidden = true;
+    els.training2Prompt.hidden = true;
+    els.training2Instruction.hidden = true;
+    els.chordPrompt.hidden = false;
+
+    renderPianoForTraining1();
+    clearFeedback();
+    showChordQuestion();
+    lockAnswering = false;
+  }
+
+  // Notes accumulate (pitch classes only, any octave) until as many distinct
+  // notes as the chord has have been played, then the chord is judged. Stale
+  // partial input expires so one stray key doesn't spoil the next attempt.
+  function handleChordNote(pitchClass) {
+    if (lockAnswering || state.round.completed) return;
+    if (Date.now() < chordInput.ignoreUntil) return;
+    if (chordInput.showingResult) {
+      chordInput.played = [];
+      chordInput.showingResult = false;
+    }
+    if (chordInput.played.indexOf(pitchClass) === -1) chordInput.played.push(pitchClass);
+    renderChordPlayed();
+
+    if (chordInput.idleTimer) clearTimeout(chordInput.idleTimer);
+    var chord = Chords.byId(state.currentQuestion.chordId);
+    if (chordInput.played.length < chord.notes.length) {
+      chordInput.idleTimer = setTimeout(function () {
+        chordInput.played = [];
+        renderChordPlayed();
+      }, CHORD_IDLE_MS);
+      return;
+    }
+
+    var isCorrect = chord.notes.every(function (note) {
+      return chordInput.played.indexOf(note) !== -1;
+    });
+    if (isCorrect) {
+      Scoring.applyCorrect(state);
+      showFeedback('correct');
+      updateStatusBar();
+      lockAnswering = true;
+      setTimeout(advanceChord, CORRECT_ADVANCE_DELAY_MS);
+    } else {
+      Scoring.applyIncorrect(state);
+      showFeedback('incorrect');
+      updateStatusBar();
+      chordInput.showingResult = true;
+      chordInput.ignoreUntil = Date.now() + CHORD_EXTRA_NOTE_GRACE_MS;
+    }
+  }
+
+  function advanceChord() {
+    if (state.round.completed) return;
+    var nextIndex = state.round.currentIndex + 1;
+    if (nextIndex >= state.round.notes.length) {
+      completeRound();
+      return;
+    }
+    state.round.currentIndex = nextIndex;
+    state.currentQuestion = { chordId: state.round.notes[nextIndex] };
+    showChordQuestion();
+    clearFeedback();
+    lockAnswering = false;
   }
 
   function handleTraining1Answer(pitchClass, options) {
@@ -2300,6 +2635,8 @@ h2 {
 
   function startTraining2() {
     els.training1Controls.hidden = true;
+    els.staffContainer.hidden = false;
+    els.chordPrompt.hidden = true;
     els.training2Prompt.hidden = false;
     els.training2Instruction.hidden = false;
 
@@ -2352,6 +2689,10 @@ h2 {
   // ---------- Round lifecycle ----------
 
   function startRound() {
+    if (isChordMode()) {
+      startChordRound();
+      return;
+    }
     var width = els.staffContainer.clientWidth || 800;
     staffRenderer.setScale(1);
     var capacity = staffRenderer.computeNoteCapacity(width);
@@ -2385,6 +2726,7 @@ h2 {
     state.round.completed = true;
     lockAnswering = true;
     staffRenderer.disableInteraction();
+    resetChordInput();
     clearFeedback();
     showScreen('settings');
   }
@@ -2427,6 +2769,7 @@ h2 {
       });
 
       els.stopTrainingBtn.addEventListener('click', stopTraining);
+      els.chordHintBtn.addEventListener('click', toggleChordHint);
 
       showScreen('settings');
     } catch (error) {
