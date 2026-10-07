@@ -1909,6 +1909,16 @@ h2 {
     return !!(navigator.requestMIDIAccess);
   }
 
+  // iPadOS 13+ reports itself as "Macintosh" but is touch-capable; iPhone/iPod
+  // keep their own platform strings. Every iOS browser (Chrome included) runs
+  // on Apple's WebKit, which has never implemented Web MIDI, so no browser
+  // switch on iOS will help -- worth a distinct message rather than telling
+  // the user to "try Chrome" when they already are on Chrome.
+  function isIOS() {
+    return /iP(hone|od|ad)/.test(navigator.platform) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
   function report(message) {
     if (onStatus) onStatus(message);
   }
@@ -1947,7 +1957,9 @@ h2 {
     enabled = true;
     if (!isSupported()) {
       enabled = false;
-      report('MIDI is not supported in this browser. Try Chrome or Edge.');
+      report(isIOS()
+        ? 'MIDI keyboards aren’t supported on iPhone/iPad in any browser (Apple requires them all to use an engine without MIDI support). Try a desktop or Android browser instead.'
+        : 'MIDI is not supported in this browser. Try Chrome or Edge.');
       return;
     }
     if (access) {
